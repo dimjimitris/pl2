@@ -306,13 +306,11 @@ Lemma and_commutative :
     x && y = y && x.
 Proof.
   intros x y.
-  destruct x.
-  - destruct y.
-    + simpl. reflexivity.
-    + simpl. reflexivity.
-  - destruct y.
-    + simpl. reflexivity.
-    + simpl. reflexivity.
+  destruct x, y.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
 Qed.
 
 (* [and_commutative] Grade: 0/5 *)
@@ -336,14 +334,18 @@ Lemma xor_correct :
   forall (x y : bool), (* universal quantifier *)
     xor x y = (x || y) && (negb (x && y)).
 Proof.
+  (** Alternative
   intros x y.
   destruct x.
-  - destruct y.
-    + simpl. reflexivity.
-    + simpl. reflexivity.
-  - destruct y.
-    + simpl. reflexivity.
-    + simpl. reflexivity.
+  - simpl. unfold negb. reflexivity.
+  - simpl. unfold andb. reflexivity.
+  *)
+  intros x y.
+  destruct x, y.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
 Qed.
 
 
