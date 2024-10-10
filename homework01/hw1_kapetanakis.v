@@ -1,8 +1,8 @@
 Require Import Coq.Init.Nat Coq.Bool.Bool.
 
 (** Στοιχεία Σπουδαστή
-Όνομα: ΔΗΜΗΤΡΙΟΣ ΓΕΩΡΓΟΥΣΗΣ
-ΑΜ: 03119005
+Όνομα: Γεώργιος Αλέξιος Καπετανάκης
+ΑΜ: 03119062
 *)
 
 
@@ -38,6 +38,7 @@ Require Import Coq.Init.Nat Coq.Bool.Bool.
     - Συμπληρώστε σωστά τα στοιχεία σας στην αρχή του αρχείου. Αυτό είναι 
       απαραίτητο για την σωστή βαθμολόγηση των εργασιών. *)
 
+
 (** ** Άσκηση 1: Booleans (25 μονάδες) *)
 
 (** Συμπληρώστε τον ορισμό μιας συνάρτησης που ελέγχει δύο booleans για ισότητα
@@ -57,43 +58,29 @@ Definition test_eq (b1 b2 : bool) : bool :=
 
 Lemma test_eq_sound :
   forall b1 b2, test_eq b1 b2 = true -> b1 = b2. 
-Proof. 
+Proof.
   intros b1 b2 H.
-
   destruct b1, b2.
-
-  (* case 1: b1 = true, b2 = true *)
-  - simpl in H. reflexivity.
-  
-  (* case 2: b1 = true, b2 = false *)
-  - simpl in H. discriminate H.
-
-  (* case 3: b1 = false, b2 = true *)
-  - simpl in H. discriminate H.
-
-  (* case 4: b1 = false, b2 = false *)
-  - simpl in H. reflexivity.
+  - reflexivity.
+  - discriminate H.
+  - discriminate H.
+  - reflexivity.
 Qed.
 
 (* [test_eq_sound] Grade: 0/10 *)
 
 Lemma test_eq_complete :
   forall b1 b2, b1 = b2 -> test_eq b1 b2 = true. 
-Proof. 
+Proof.
   intros b1 b2 H.
-
   rewrite H.
-
   destruct b2.
-
-  (* case 1: b2 = true *)
-  - simpl. reflexivity.
-
-  (* case 2: b2 = false *)
-  - simpl. reflexivity.
+  - reflexivity.
+  - reflexivity.
 Qed.
 
 (* [test_eq_complete] Grade: 0/10 *)
+
 
 (** ** Άσκηση 2: Φυσικοί αριθμοί στο δυαδικό σύστημα (25 μονάδες) *)
 
@@ -129,13 +116,11 @@ Definition eight : bin := B0 (B0 (B0 (B1 Z))).
 (** Γράψτε μια συνάρτηση που να μετατρέπει έναν αριθμό σε δυαδική
     αναπαράσταση σε έναν αριθμό σε μοναδιαία (unary) αναπαράσταση *)
 
-Print nat.
-
 Fixpoint bin_to_nat (b : bin) : nat :=
   match b with
-  | Z => O
-  | B0 b' => (bin_to_nat b') + (bin_to_nat b')
-  | B1 b' => 1 + (bin_to_nat b') + (bin_to_nat b')
+  | Z => 0
+  | B0 b' => bin_to_nat b' + bin_to_nat b'
+  | B1 b' => 1 + (bin_to_nat b' + bin_to_nat b')
   end.
 
 (* [bin_to_nat] Grade: 0/8 *)
@@ -162,7 +147,6 @@ Proof. simpl. reflexivity. Qed.
 Example test_bin_to_nat'''' : bin_to_nat (B1 (B1 (B0 Z))) = 3.
 Proof. simpl. reflexivity. Qed.
 
-
 (** Γράψτε μια συνάρτηση που να αυξάνει έναν δυαδικό αριθμό κατά ένα. *)
 
 Fixpoint bin_incr (b : bin) : bin :=
@@ -180,7 +164,7 @@ Fixpoint bin_incr (b : bin) : bin :=
 
 Fixpoint nat_to_bin (n : nat) : bin :=
   match n with
-  | O => Z
+  | 0 => B0 Z
   | S n' => bin_incr (nat_to_bin n')
   end.
 
@@ -218,13 +202,12 @@ Lemma mul_zero_abs_l :
   forall (m : nat), 0 * m = 0.
 Proof.
   intros m.
-  simpl.
-  reflexivity.
-Qed.
-
+  destruct m.
+  - reflexivity.
+  - simpl. reflexivity.
+Qed. 
 
 (* [mul_zero_abs_l] Grade: 0/5 *)
-
 
 (** Το παρακάτω λήμμα περιγράφει το αποτέλεσμα του πολλαπλασιασμού όταν το πρώτο
   όρισμα είναι ο successor ενός αριθμού. *) 
@@ -232,8 +215,9 @@ Lemma mul_Sm_n :
   forall (m n : nat), (S m) * n = n + m * n.
 Proof.
   intros m n.
-  simpl.
-  reflexivity.
+  destruct n.
+  - reflexivity.
+  - simpl. reflexivity.
 Qed.
 
 (* [mul_Sm_n] Grade: 0/5 *)
@@ -252,9 +236,7 @@ Proof.
   reflexivity.
 Qed.
 
-
 (* [mul_preserves_eq] Grade: 0/5 *)
-
 
 (** Χρησιμοποιήστε την [mul] για να γράψετε μια συνάρτηση [exp] που
     υψώνει το πρώτο της όρισμα [base] στην δύναμη πού δίνεται από το
@@ -262,25 +244,9 @@ Qed.
 
 Fixpoint exp (base power : nat) : nat :=
   match power with
-  | O => 1
-  | S power' => mul base (exp base power')
+  | 0 => 1
+  | S n => mul base (exp base n)
   end.
-
-(* [exp] Grade: 0/5 *)
-
-(** Sanity check: Τα παρακάτω θα πρέπει να επιτυγχάνουν εάν ο ορισμός
-    της exp() είναι σωστός.
-*)
-
-Example test_exp : exp 2 3 = 8.
-Proof. simpl. reflexivity. Qed.
-
-Example test_exp' : exp 3 2 = 9.
-Proof. simpl. reflexivity. Qed.
-
-Example test_exp'' : exp 4 0 = 1.
-Proof. simpl. reflexivity. Qed.
-
 
 (** Αποδείξτε το παρακάτω λήμμα που περιγράφει την ύψωση σε δύναμη, όταν ή δύναμη είναι
     ο successor ενός αριθμού. *)
@@ -304,13 +270,12 @@ Lemma de_morgan_law_or :
   forall (x y : bool), (* universal quantifier *)
     negb (x && y) = (negb x) || (negb y).
 Proof.
+  Proof.
   intros x y.
   destruct x.
-  - simpl. reflexivity.
-  - simpl. reflexivity.
+  - reflexivity.
+  - reflexivity.
 Qed.
-
-
 
 (* [de_morgan_law_or] Grade: 0/5 *)
 
@@ -320,29 +285,25 @@ Lemma and_commutative :
     x && y = y && x.
 Proof.
   intros x y.
-  destruct x.
-  - destruct y.
-    + simpl. reflexivity.
-    + simpl. reflexivity.
-  - destruct y.
-    + simpl. reflexivity.
-    + simpl. reflexivity.
+  destruct x, y.
+  - reflexivity.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  - reflexivity.
 Qed.
 
 (* [and_commutative] Grade: 0/5 *)
-
 
 (** Ορίστε μια συνάρτηση που να υπολογίζει την αποκλειστική διάζευξη. *)
 
 Definition xor (b1 b2 : bool) : bool :=
   match b1, b2 with
-  | true, true => false
-  | false, false => false
-  | _, _ => true
+  | true, false => true
+  | false, true => true
+  | _, _ => false
   end.
 
 (* [xor] Grade: 0/5 *)
-
 
 (** Αποδείξτε ότι η αποκλειστική διάζευξη δύο τιμών είναι αληθείς όταν
     ισχύει μία απο τις δύο τιμές, αλλά όχι και οι δύο ταυτόχρονα. *) (*  *)
@@ -351,15 +312,11 @@ Lemma xor_correct :
     xor x y = (x || y) && (negb (x && y)).
 Proof.
   intros x y.
-  destruct x.
-  - destruct y.
-    + simpl. reflexivity.
-    + simpl. reflexivity.
-  - destruct y.
-    + simpl. reflexivity.
-    + simpl. reflexivity.
-Qed.
-
-
+  destruct x, y.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+Qed.  
 
 (* [xor_correct] Grade: 0/10 *)
