@@ -61,17 +61,9 @@ Proof.
   intros b1 b2 H.
 
   destruct b1, b2.
-
-  (* case 1: b1 = true, b2 = true *)
   - simpl in H. reflexivity.
-  
-  (* case 2: b1 = true, b2 = false *)
   - simpl in H. discriminate H.
-
-  (* case 3: b1 = false, b2 = true *)
   - simpl in H. discriminate H.
-
-  (* case 4: b1 = false, b2 = false *)
   - simpl in H. reflexivity.
 Qed.
 
@@ -81,15 +73,9 @@ Lemma test_eq_complete :
   forall b1 b2, b1 = b2 -> test_eq b1 b2 = true. 
 Proof. 
   intros b1 b2 H.
-
   rewrite H.
-
   destruct b2.
-
-  (* case 1: b2 = true *)
   - simpl. reflexivity.
-
-  (* case 2: b2 = false *)
   - simpl. reflexivity.
 Qed.
 
