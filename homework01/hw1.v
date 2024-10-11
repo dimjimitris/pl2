@@ -59,7 +59,7 @@ Lemma test_eq_sound :
   forall b1 b2, test_eq b1 b2 = true -> b1 = b2. 
 Proof. 
   intros b1 b2 H.
-
+  
   destruct b1, b2.
   - simpl in H. reflexivity.
   - simpl in H. discriminate H.
@@ -334,12 +334,6 @@ Lemma xor_correct :
   forall (x y : bool), (* universal quantifier *)
     xor x y = (x || y) && (negb (x && y)).
 Proof.
-  (** Alternative
-  intros x y.
-  destruct x.
-  - simpl. unfold negb. reflexivity.
-  - simpl. unfold andb. reflexivity.
-  *)
   intros x y.
   destruct x, y.
   - simpl. reflexivity.
