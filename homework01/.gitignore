@@ -1,0 +1,21 @@
+# Ignore Coq compiled files
+*.vo
+*.glob
+
+# Ignore Coq intermediate files
+*.aux
+*.vok
+*.vos
+
+# Ignore Coq project files
+*.coq-native
+.coq-native/
+
+# Ignore Coq documentation files
+*.html
+*.css
+*.js
+
+# Ignore backup files
+*~
+\#*\#
