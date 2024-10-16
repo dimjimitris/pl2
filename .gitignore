@@ -19,3 +19,6 @@
 # Ignore backup files
 *~
 \#*\#
+
+# Ignore lia cache
+.lia.cache

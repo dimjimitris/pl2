@@ -2,8 +2,8 @@ Require Import Coq.Init.Nat Coq.Arith.Arith Coq.Lists.List.
 Import ListNotations. 
 
 (** Στοιχεία Σπουδαστή
-Όνομα:  
-ΑΜ: 
+Όνομα: ΔΗΜΗΤΡΙΟΣ ΓΕΩΡΓΟΥΣΗΣ
+ΑΜ: 03119005
 *)
 
 
@@ -45,8 +45,8 @@ Import ListNotations.
 (** Συμπληρώστε τον ορισμό μιας συνάρτησης που παίρνει ως ορίσματα δύο
     συναρτήσεις και επιστρέφει τη σύνθεσή τους. *)
 
-Definition comp {A B C : Type} (f : A -> B) (g : B -> C) : A -> C (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition comp {A B C : Type} (f : A -> B) (g : B -> C) : A -> C :=
+  fun (a : A) => g (f a).
 
 (* [comp] Grade: 0/1 *)
 
@@ -54,8 +54,8 @@ Definition comp {A B C : Type} (f : A -> B) (g : B -> C) : A -> C (* :=   ___ FI
 (** Συμπληρώστε τον ορισμό του κατηγορήματος (predicate) που δηλώνει
     ότι μια συνάρτηση να είναι ένα-προς-ένα (injective). *)
 
-Definition injective {A B : Type} (f : A -> B) : Prop (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition injective {A B : Type} (f : A -> B) : Prop :=
+  forall a b, f a = f b -> a = b.
 
 (* [injective] Grade: 0/1 *)
 
@@ -65,10 +65,21 @@ Definition injective {A B : Type} (f : A -> B) : Prop (* :=   ___ FILL IN HERE _
     Αντικαταστήστε το [False] με τη σωστή διατύπωση. *)
 
 Theorem comp_injective :
-  forall A B C (f : A -> B) (g : B -> C), False. (* ___ FILL IN HERE ___ *)
+  forall A B C (f : A -> B) (g : B -> C), injective f -> injective g -> injective (comp f g).
 Proof. 
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros A B C f g Hf Hg.
+  unfold injective.
+
+  intros a b H.
+  unfold comp in H.
+  unfold injective in Hf, Hg.
+  specialize Hf with (a := a) (b := b).
+  apply Hf.
+  specialize Hg with (a := f a) (b := f b).
+  apply Hg. assumption.
+Qed.
+
+
 
 (* [comp_injective] Grade: 0/3 *)
 
@@ -122,8 +133,12 @@ Check plus_n_Sm.
 Lemma bin_to_nat_pres_incr :
   forall b : bin, bin_to_nat (bin_incr b) = 1 + (bin_to_nat b).
 Proof.
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros b.
+  induction b.
+  - reflexivity.
+  - reflexivity.
+  - simpl. rewrite IHb. simpl. rewrite <- plus_n_Sm. reflexivity.
+Qed.
 
 (* [bin_to_nat_pres_incr] Grade: 0/20 *)
 
@@ -136,8 +151,12 @@ Admitted.
 Theorem nat_bin_nat :
   forall n, bin_to_nat (nat_to_bin n) = n.
 Proof.
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros n.
+  induction n.
+  - reflexivity.
+  - simpl. rewrite bin_to_nat_pres_incr. simpl. rewrite IHn. reflexivity.
+Qed.
+
 
 (* [nat_bin_nat] Grade: 0/10 *)
 
@@ -162,8 +181,12 @@ Admitted.
 Lemma de_morgan_or :
   forall (A B : Prop), ~ (A \/ B) -> ~ A /\ ~ B. 
 Proof.
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros A B H.
+  split; intros P.
+  - apply H. left. assumption.
+  - apply H. right. assumption.
+Qed.  
+
 
 (* [de_morgan_or] Grade: 0/3 *)
 
@@ -172,8 +195,12 @@ Admitted.
 
 Lemma not_not_EM : forall P, ~~ (P \/ ~ P).
 Proof.
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros P H.
+  apply H.
+  apply de_morgan_or in H.
+  destruct H as [H H'].
+  right. assumption.
+Qed.
 
 (* [not_not_EM] Grade: 0/3 *)
 
@@ -207,12 +234,19 @@ Proof.
   split.
   
   - (* DNE -> EM *)
-    admit. (*  ___ FILL IN HERE ___ *)
+    intros H P.
+    specialize H with (P := P \/ ~ P).
+    apply H.
+    apply not_not_EM.
     (* Hint: χρησιμοποιήστε το λήμμα [not_not_EM]. *)
     
   - (* EM -> DNE *)
-    admit. (*  ___ FILL IN HERE ___ *)
-Admitted.
+    intros H P Hnn.
+    specialize H with (P := P).
+    destruct H.
+    + assumption.
+    + contradiction.
+Qed.
 
 (* [DNE_EM] Grade: 0/5 *)
 
@@ -223,9 +257,21 @@ Admitted.
 Lemma de_morgan_and :
   forall (A B : Prop), ~ (A /\ B) -> ~ A \/ ~ B. 
 Proof.
+  intros A B H.
+  left. intros HA. apply H. split.
+  - assumption.
+  - assert (forall X Y, X -> ~ (X /\ Y) -> ~ Y) as H'.
+    {
+      intros X Y H1 H2 H3. apply H2. split; assumption.
+    }
+    specialize H' with (X := A) (Y := B).
+    Fail apply H'.
 Abort.
 
-(** Σύντομη απάντηση: ___ FILL IN HERE ___ *)
+(** Σύντομη απάντηση: Στην παραπάνω απόπειρα απόδειξης αν αρχικά κάναμε 'right'.
+    Θα παίρναμε παρόμοιο αποτέλεσμα, λόγω συμμετρίας. Χρειαζόμαστε κάποιον τρόπο
+    να διώξουμε την διπλή άρνηση, το οποίο ισοδυναμεί με το να χρησιμοποιήσουμε
+    το EM. Αναμένουμε η απόδειξη να είναι δυνατή με αυτό. *)
 
 (* [de_morgan_and] Grade: 0/4 *)
 
@@ -235,8 +281,13 @@ Lemma de_morgan_and_ΕΜ :
   EM ->
   forall (A B : Prop), ~ (A /\ B) -> ~ A \/ ~ B.
 Proof.
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros HEM A B H.
+  unfold EM in HEM.
+  specialize HEM with (P := A).
+  destruct HEM as [HA | HA].
+  - right. intros HB. apply H. split; assumption.
+  - left. assumption.
+Qed.
 
 (* [de_morgan_and_ΕΜ] Grade: 0/5 *)
 
@@ -249,8 +300,8 @@ Admitted.
 *)
 
 Inductive In {A : Type} (x : A) : list A -> Prop := 
-(*  ___ FILL IN HERE ___ *)
-.
+  | In_head : forall l, In x (x :: l)
+  | In_tail : forall y l, In x l -> In x (y :: l).
 
 (* [In] Grade: 0/2 *)
 
@@ -262,8 +313,11 @@ Lemma In_map :
  forall (A B : Type) (x : A) (l : list A) (f : A -> B),  
     In x l -> In (f x) (map f l). 
 Proof. 
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros A B x l f H.
+  induction H.
+  - simpl. left.
+  - simpl. right. apply IHIn.
+Qed.  
 
 (* [In_map] Grade: 0/2 *)
 
@@ -288,33 +342,35 @@ Admitted.
     [Αdmitted] ορισμό χωρίς το σώμα της συνάρτησης. *)
 
 
-Fixpoint fold_left {A B} (f : A -> B -> A) (l : list B) (a0 : A) {struct l} : A 
-(* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Fixpoint fold_left {A B} (f : A -> B -> A) (l : list B) (a0 : A) {struct l} : A :=
+  match l with
+  | [] => a0
+  | hd :: tl => fold_left f tl (f a0 hd)
+  end.
+
 
 (* [fold_left] Grade: 0/2 *)
 
 (** Προθέρμανση: χρησιμοποιήστε την [fold_left] για να γράψετε μία συνάρτηση [length] *)
 
-Definition length (l : list nat) : nat (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition length (l : list nat) : nat :=
+  fold_left (fun a0 _ => 1 + a0) l 0.
 
 (* [length] Grade: 0/0.5 *)
 
 Example test_length : length [1;2;3;4] = 4. 
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 (** Προθέρμανση: χρησιμοποιήστε την [fold_left] για να γράψετε μία συνάρτηση που
     αθροίζει τα στοιχεία μιας λίστας φυσικών αριθμών *)
-Definition sum (l : list nat) : nat (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition sum (l : list nat) : nat :=
+  fold_left (fun a0 x => x + a0) l 0.
+
 
 (* [sum] Grade: 0/0.5 *)
 
 Example test_sum : sum [1;2;3;4] = 10. 
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 
 
@@ -330,11 +386,27 @@ Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγρ
     Αντικαταστήστε το [False] με τη σωστή διατύπωση.
 *)
 
+
+Definition assoc {A : Type} (f : A -> A -> A) :=
+  forall (x y z: A), f (f x y) z = f x (f y z).
+
+Definition comm {A : Type} (f : A -> A -> A) :=
+  forall (x y: A), f x y = f y x.
+
 Theorem fold_left_assoc_comm :
-  False (* ___ FILL IN HERE ___ *). 
-Proof. 
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  forall A (f : A -> A -> A), assoc f -> comm f ->
+  (forall (l : list A) (a0 : A) (a : A), f (fold_left f l a0) a = fold_left f l (f a0 a)).
+Proof.
+  intros A f Hassoc Hcomm.
+  unfold assoc, comm in Hassoc, Hcomm.
+  induction l.
+  - intros. simpl. reflexivity.
+  - intros. simpl.
+    rewrite Hcomm with (x := a0) (y := a1).
+    rewrite Hassoc with (x := a1) (y := a0) (z := a).
+    rewrite Hcomm with (x := a1) (y := f a0 a).
+    apply IHl with (a0 := f a0 a) (a := a1).
+Qed.
 
 (* [fold_left_assoc_comm] Grade: 0/25 *)
 
@@ -354,34 +426,34 @@ Admitted.
     όρισμα στην επόμενη εφαρμογή της [f] στο προηγούμενο στοιχείο
     της λίστας. *)
 
-Fixpoint fold_right {A B} (f : B -> A -> A) (l : list B) (a0 : A) {struct l} : A  
-(* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Fixpoint fold_right {A B} (f : B -> A -> A) (l : list B) (a0 : A) {struct l} : A  :=
+  match l with
+  | [] => a0
+  | hd :: tl => f hd (fold_right f tl a0)
+  end.
 
 (* [fold_right] Grade: 0/2 *)
 
 (** Προθέρμανση: χρησιμοποιήστε την [fold_right] για να γράψετε μία συνάρτηση [length'] *)
 
-Definition length' (l : list nat) : nat (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition length' (l : list nat) : nat :=
+  fold_right (fun _ a0 => 1 + a0) l 0.
 
 (* [length'] Grade: 0/0.5 *)
 
 Example test_length' : length' [1;2;3;4] = 4.
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 (** Προθέρμανση: χρησιμοποιήστε την [fold_right] για να γράψετε μία
     συνάρτηση που αθροίζει τα στοιχεία μιας λίστας φυσικών αριθμών *)
 
-Definition sum' (l : list nat) : nat (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition sum' (l : list nat) : nat :=
+  fold_right (fun x a0 => x + a0) l 0.
 
 (* [sum'] Grade: 0/0.5 *)
 
 Example test_sum' : sum' [1;2;3;4] = 10. 
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 (** Αποδείξτε ότι αν μια συνάρτηση [f : A -> A -> A] είναι
     αντιμεταθετική και προσεταιριστική τότε για κάθε λίστα [l] και αρχική
@@ -399,10 +471,20 @@ Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγρ
     λήμματος. *)
 
 Theorem fold_left_fold_right :
-  False (* ___ FILL IN HERE ___*).
+  forall A (f : A -> A -> A), assoc f -> comm f ->
+  (forall (l : list A) (a0 : A), fold_right f l a0 = fold_left f l a0).
 Proof. 
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros A f Hassoc Hcomm l a0.
+  induction l.
+  - simpl. reflexivity.
+  - simpl. rewrite IHl.
+    unfold comm in Hcomm.
+    rewrite Hcomm with (x := a) (y := fold_left f l a0).
+    rewrite fold_left_assoc_comm.
+    + reflexivity.
+    + assumption.
+    + unfold comm. assumption.
+Qed.
 
 (* [fold_left_fold_right] Grade: 0/10 *)
 
@@ -415,6 +497,20 @@ Admitted.
     πρότυπο των [test_sum] και [test_sum'] που να δείχνουν ότι η
     συνάρτηση επιστρέφει διαφορετικό αποτέλεσμα. *)
 
-(*  ___ FILL IN HERE ___ *)
+Definition foo x y := x - y. (** Χρησιμοποιήσαμε ως Α το nat *)
+
+Example fold_left_fold_right_different :
+  fold_left foo [4;3;2;1] 0 = fold_right foo [4;3;2;1] 0 -> False.
+Proof. simpl. intros H. discriminate H. Qed.
+
+Example fold_left_fold_right_different' :
+  fold_left foo [10;7;3;1] 0 = fold_right foo [10;7;3;1] 0 -> False.
+Proof. simpl. intros H. discriminate H. Qed.
+
+(** Η συνάρτηση foo() είναι η πράξη της αφαίρεσης στους nat.
+    Η αφαίρεση δεν έχει την αντιμεταθετική ιδιότητα. Συνεπώς,
+    τα fold_left() και fold_right() σε ίδια λίστα δεν δίνουν εγγυημένα
+    το ίδιο αποτέλεσμα. Πράγμα που επαληθεύουμε με τα παραδείγματά μας.
+*)
 
 (* [fold_left_fold_right_different] Grade: 0/5 *)
