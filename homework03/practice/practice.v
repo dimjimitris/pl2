@@ -20,7 +20,16 @@ Theorem division_theorem_existence :
     exists q r,
       m = q * n + r /\ r < n. 
 Proof.
-Admitted.
+  intros m n Hnp.
+  induction m.
+  - exists 0, 0. lia.
+  - destruct IHm as [q' IHm]. destruct IHm as [r' IHm].
+    destruct IHm as [IHm H].
+    rewrite IHm. rewrite plus_n_Sm with (n := q' * n) (m := r').
+    destruct (Nat.eq_dec r' (n - 1)) as [Hr | Hr].
+    + exists (S q'), 0. split; lia.
+    + exists q', (S r'). split; lia.
+Qed.
 
 (** Note that the above proof provides an procedure for finding [q]
     and [r], i.e., an _algorithm_ euclidean division. We could in
@@ -48,14 +57,25 @@ Theorem division_theorem_uniqueness :
     m = q2 * n + r2 -> r2 < n ->
     q1 = q2 /\ r1 = r2.
 Proof.
-Admitted.
+  intros m n q1 q2 r1 r2 Hmt H1 Hlt1 H2 Hlt2.
+  assert (Hlt3: (q1 - q2) * n < n). lia.
+  assert (Hlt4: (q2 - q1) * n < n). lia.
+  destruct (q1 - q2) eqn: Heq1.
+  destruct (q2 - q1) eqn: Heq2.
+  - assert (Heq : q1 = q2). lia.
+    split; lia.
+  - simpl in *. lia. (** contradiction *)
+  - simpl in *. lia. (** contradiction *)
+Qed.
 
 (** Bonus: Prove the induction principle on [nat]s by writing a
     recursive function. *)
 
-Fixpoint my_nat_ind (P : nat -> Prop) (Hbase : P 0) (Hind : forall n, P n -> P (S n)) (n : nat) : P n
-(* := __ FILL IN HERE __ *)
-. Admitted.
+Fixpoint my_nat_ind (P : nat -> Prop) (Hbase : P 0) (Hind : forall n, P n -> P (S n)) (n : nat) : P n :=
+  match n with
+  | 0 => Hbase
+  | S n' => Hind n' (my_nat_ind P Hbase Hind n')
+  end.
 
 Check my_nat_ind. 
 
