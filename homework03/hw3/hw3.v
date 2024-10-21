@@ -302,11 +302,22 @@ Theorem optimize_com_correct :
   forall (st : imp_state) (c : com) (st' : imp_state),
   st =[ c ]=> st' -> st =[ optimize_com c ]=> st'.
 Proof.
-  intros st c st' H.
-  induction c.
-  - simpl. assumption.
-  - simpl.
-
+  intros st c st'.
+    intros H.
+    induction H; simpl.
+    - constructor.
+    - constructor. rewrite <- H. apply optimize_correct.
+    - eapply E_Seq.
+      + apply IHceval1.
+      + apply IHceval2.
+    - apply E_IfTrue; assumption.
+    - apply E_IfFalse; assumption.
+    - apply E_WhileFalse. assumption.
+    - simpl in *. eapply E_WhileTrue.
+      + assumption.
+      + apply IHceval1.
+      + apply IHceval2.
+Qed.
 
 (* [optimize_com_correct] grade 0/7 *)
 

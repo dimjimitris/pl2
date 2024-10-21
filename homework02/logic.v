@@ -1071,46 +1071,6 @@ Proof.
   - intros H2 H3. apply H1. split; assumption.
 Qed.
 
-(** *** Existential Quantification *)
-
-Module Exists.
-
-  (** To prove that [exists x, P x] for a predicate [P : A -> Prop],
-      we must provide an [x] and a proof of [P x]. *)
-  Inductive ex (A : Type) (P : A -> Prop) : Prop :=
-    ex_intro : forall x : A, P x -> ex A P.
-
-
-  (** Some convenient notation. *)
-  Notation "'exists' x , p" := (ex _ (fun x => p))
-                                 (at level 200, x binder, right associativity) : type_scope.
-
-End Exists.
-
-Lemma fourtytwo_is_even_1 :
-  exists (n : nat), 42 = n + n.
-Proof.
-  assert (Heq : 42 = 21 + 21) by lia.
-  (* the notation [by some_tactic] allows as to immediately prove the
-     goal using [some_tactic] *)
-
-  (* This will apply the constructor using [21] as evidence *)
-  apply ex_intro with (x := 21).
-  assumption.
-Qed.
-
-Lemma fourtytwo_is_even_2 :
-  exists (n : nat), 42 = n + n.
-Proof.
-  (* There is a more intuitive way to prove this *)
-
-  (* Use the tactic [exist] to provide the evidence *)
-  exists 21.
-
-  (* prove the proposition about the evidence *)
-  lia.
-Qed.
-
 
 (** *** Equality *)
 
@@ -1182,6 +1142,60 @@ Proof.
   congruence.
 Qed.
 
+(** *** Existential Quantification *)
+
+Module Exists.
+
+  (** To prove that [exists x, P x] for a predicate [P : A -> Prop],
+      we must provide an [x] and a proof of [P x]. *)
+  Inductive ex (A : Type) (P : A -> Prop) : Prop :=
+    ex_intro : forall a : A, P a -> ex A P.
+
+
+  (** Some convenient notation. *)
+  Notation "'exists' x , p" :=
+    (ex _ (fun x => p))
+      (at level 200, x binder, right associativity) : type_scope.
+
+End Exists.
+
+Lemma fourtytwo_is_even_1 :
+  exists (n : nat), 42 = n + n.
+Proof.
+  apply ex_intro with (x := 21).
+
+  reflexivity.
+Qed.
+
+Lemma fourtytwo_is_even_2 :
+  exists (n : nat), 42 = n + n.
+Proof.
+  (* There is a more intuitive way to prove this *)
+
+  (* Use the tactic [exist] to provide the evidence *)
+  exists 21. (* This is equivalent to [apply ex_intro with (x := 21).] *)
+
+  (* prove the proposition about the evidence *)
+  reflexivity.
+Qed.
+
+
+Lemma exists_inv :
+  forall m,
+    (exists (n : nat), n + 1 = m) ->
+    (exists (n : nat), m = n + 1).
+Proof.
+  intros m H1.
+  (* if we have an hypothesis with an existential quantifier
+     we can use [inversion] to obtain the evidence and a proof
+     that the predicates holds on the evidence. *)
+  inversion H1 as [n Hn].
+
+  exists n.
+  rewrite Hn. reflexivity.
+Qed.
+
+
 (** *** Existential Variables *)
 
 (** Earlier, we used specialize to explicitly the quantifiers of
@@ -1203,7 +1217,6 @@ Proof.
 
 
   Fail apply even_or_odd_aux.
-
   (* The above tactic fails with the message:
 
       [Unable to find an instance for the variable n.]
@@ -1254,7 +1267,7 @@ Proof.
      goal. *)
 
   2:{ Fail assumption.  eassumption. (* [eassumption] can deal with existential variables. *) }
-
+  simpl.
   assumption.
 
 Qed.
@@ -1286,7 +1299,8 @@ Proof.
 
   (* Instead of providing immediately the witness, we can use
      [eexists] *)
-  eexists.  eassumption.
+  eexists.
+  eassumption.
 Qed.
 
 
@@ -1305,3 +1319,132 @@ Proof.
 
   eassumption.
 Qed.
+
+
+(** ** Induction on the Derivation of Logical Propositions *)
+
+(** Just as we can do induction on terms of inductive types, we can do
+    induction over derivations of inductive propositions. The form of
+    the induction principle is similar in both cases.
+
+    Say that we want to prove that an inductive proposition [Q x1 ... xn]
+    with zero or more parameters [x1], ..., [xn],  implies [P x1 ... xn].
+
+    To show this we may proceed by induction on the way that the proof of [Q x1 ... xn]
+    was constructed, i.e. induction on its derivation.
+
+    To show that [forall x1 .. xn, Q x1 ... xn -> P x1 ... xn] we must show the following.
+
+    1) Base cases: For each base derivation rule of the form
+<<
+           H1 ... Hm
+       -----------------
+          Q t1 ... tn
+>>
+
+       - assume that [H1], ..., [Hm]
+
+       - prove [P t1 ... tn]
+
+
+    2) Inductive cases: For each inductive derivation rule of the form
+<<
+           H1 ... Hm
+       -----------------
+         Q t1 ... tn
+>>
+
+       - assume that [H1], ..., [Hm]
+       - for each [Hi] that is a is subderivation showing [Q w1 ... wn]
+         also assume that [P w1 ... wn] (inductive hypotheses)
+       - prove [P t1 ... tn]
+*)
+
+(** Induction over derivations will be better understood with an
+    example. We write an inductive relation [le : nat -> nat -> Prop]
+    that is true if and only iff the first natural number is less than
+    or equal to the second. *)
+
+Module le.
+  Inductive le : nat -> nat -> Prop :=
+  | leO : forall m, le 0 m
+  | leS : forall n m, le n m -> le (S n) (S m).
+
+  (** We can prove or disprove the relation for certain arguments. *)
+
+  Example leq_3_5:
+    le 3 5.
+  Proof.
+    apply leS.
+    apply leS.
+    apply leS.
+    apply leO.
+    (* or just [repeat constructor] *)
+  Qed.
+
+
+  Example not_leq_5_2:
+    ~ le 5 3.
+  Proof.
+    intros Habsurd.
+    (* invert the derivation until no constructor applies *)
+
+    inversion Habsurd as [ | n m Habsurd' Heq1 Heq2 ]; subst.
+    inversion Habsurd' as [ | n m Habsurd'' Heq1 Heq2 ]; subst.
+    inversion Habsurd'' as [ | n m Habsurd''' Heq1 Heq2 ]; subst.
+    inversion Habsurd'''.
+  Qed.
+
+  (** Coq has generated an induction principle for this inductive
+      relation. *)
+
+  Check le_ind.
+
+  (** Let's examine its type. *)
+
+  Definition le_ind_type :=
+    forall P : nat -> nat -> Prop,
+
+      (* Premise (base case):
+         If [le n m] is derived with [leO], therefore [n = 0]),
+         then show [P 0 m].  *)
+      (forall m : nat, P 0 m) ->
+
+      (* Premise (inductive case):
+         If [le n m] is derived with [leS]
+         <<
+
+                le n' m'
+          --------------------(leS)
+             le (S n') (S m')
+         >>
+         then assuming that [le n' m'], [P n' m'] (inductive hypothesis), [n = S n'], [m = S n']
+
+         show [le (S n') (S m')]. *)
+    (forall n' m' : nat, le n' m' -> P n' m' -> P (S n') (S m')) ->
+
+    (* Conclusion: for all [n] [m], [le n m] implies [P n m] *)
+    forall n m : nat, le n m -> P n m.
+
+
+  (** We will use induction on the derivation to show that [le] is transitive. *)
+
+  Lemma le_transitive :
+    forall n m k,
+      le n m ->
+      le m k ->
+      le n k.
+  Proof.
+    intros n m k Hle. revert k.
+    induction Hle as [| n' m' HP IHle Heq1 Heq2];
+      intros k Hle'.
+    - apply leO.
+    - inversion Hle'; subst. (* [Hle'] can only be derived by [leS] *)
+
+       apply leS.
+       apply IHle. assumption.
+  Qed.
+
+  (** Note: In this case we can also do the proof by induction on [n]. *)
+
+End le.
