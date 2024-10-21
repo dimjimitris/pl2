@@ -52,8 +52,6 @@ Definition Y : string := "Y".
 Definition Z : string := "Z".
 Definition RES : string := "RES".
 
-Print com.
-
 Definition SWAP : com :=
   <{Z := X; X := Y; Y := Z}>.
 
@@ -83,7 +81,6 @@ Definition FACT (n : nat) : com :=
     RES := 1;
     while X <= n do { RES := RES * X; X := X + 1 }
   }>.
-
 (* [FACT] grade 0/3 *)
 
 (** Αποδείξτε την παρακάτω προδιαγραφή για το πρόγραμμα [FACT]. *)
@@ -167,13 +164,8 @@ Definition simplify (e : aexp) : aexp :=
     συνακτικού δέντρου [aexp] με bottom-up τρόπο (δηλαδή από τους
     εσωτερικούς κόμβους προς τους εξωτερικούς). *)
 
-Fixpoint optimize (e : aexp) : aexp :=
-  match e with
-  | APlus e1 e2 => APlus (optimize e1) (optimize e2)
-  | AMinus e1 e2 => AMinus (optimize e1) (optimize e2)
-  | AMult e1 e2 => AMult (optimize e1) (optimize e2)
-  | _ => simplify e
-  end.
+Fixpoint optimize (e : aexp) : aexp (* :=   ___ FILL IN HERE ___. *)
+. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
 
 (* [optimize] grade 0/3 *)
 
