@@ -5,8 +5,8 @@ Set Warnings "-notation-overriden, -parsing".
 Require Import imp.
 
 (** Στοιχεία Σπουδαστή
-Όνομα:
-ΑΜ:
+Όνομα: ΔΗΜΗΤΡΙΟΣ ΓΕΩΡΓΟΥΣΗΣ
+ΑΜ: 03119005
 *)
 
 
@@ -52,8 +52,10 @@ Definition Y : string := "Y".
 Definition Z : string := "Z".
 Definition RES : string := "RES".
 
-Definition SWAP : com (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Print com.
+
+Definition SWAP : com :=
+  <{Z := X; X := Y; Y := Z}>.
 
 (* [SWAP] grade 0/2 *)
 
@@ -63,16 +65,24 @@ Lemma SWAP_correct :
   forall (st : imp_state),
   exists (st' : imp_state), st =[ SWAP ]=> st' /\ st' X = st Y /\ st' Y = st X.
 Proof.
-  (*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros st.
+  eexists. repeat split.
+  - unfold SWAP. repeat eapply E_Seq; apply E_Asgn; constructor.
+  - unfold update_st. reflexivity.
+  - unfold update_st. reflexivity.
+Qed.
 
 (* [SWAP_correct] grade 0/3 *)
 
 (** Γράψτε ένα πρόγραμμα Imp που υπολογίζει το παραγοντικό ενός αριθμού [n]
     και αποθηκεύει την τιμή του στην μεταβλητή [RES] *)
 
-Definition FACT (n : nat) : com (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition FACT (n : nat) : com :=
+  <{
+    X := 1;
+    RES := 1;
+    while X <= n do { RES := RES * X; X := X + 1 }
+  }>.
 
 (* [FACT] grade 0/3 *)
 
@@ -82,8 +92,34 @@ Lemma FACT_5_correct :
   forall (st : imp_state),
   exists (st' : imp_state), st =[ FACT 5 ]=> st' /\ st' RES = 120.
 Proof.
-  (*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros st.
+  eexists. repeat split.
+  {
+    unfold FACT. repeat eapply E_Seq; try apply E_Asgn; try reflexivity.
+    eapply E_WhileTrue; try reflexivity.
+    {
+      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
+    }
+    eapply E_WhileTrue; try reflexivity.
+    {
+      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
+    }
+    eapply E_WhileTrue; try reflexivity.
+    {
+      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
+    }
+    eapply E_WhileTrue; try reflexivity.
+    {
+      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
+    }
+    eapply E_WhileTrue; try reflexivity.
+    {
+      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
+    }
+    eapply E_WhileFalse; try reflexivity.
+  }
+  unfold update_st. reflexivity.
+Qed.
 
 (* [FACT_correct] grade 0/7 *)
 
@@ -111,8 +147,18 @@ Admitted.
     Για παράδειγμα ο όρος [<{ 0 + e }>] (δηλαδή το [APlus (ANum 0) e])
     θα πρέπει να απλοποιείται στο [e] *)
 
-Definition simplify (e : aexp) : aexp (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition simplify (e : aexp) : aexp :=
+  match e with
+  | APlus (ANum 0) e' => e'
+  | APlus e' (ANum 0) => e'
+  | AMinus e' (ANum 0) => e'
+  | AMinus (ANum 0) _ => ANum 0
+  | AMult (ANum 1) e' => e'
+  | AMult e' (ANum 1) => e'
+  | AMult (ANum 0) _ => ANum 0
+  | AMult _ (ANum 0) => ANum 0
+  | _ => e
+  end.
 
 (* [simplify] grade 0/5 *)
 
@@ -121,8 +167,13 @@ Definition simplify (e : aexp) : aexp (* :=   ___ FILL IN HERE ___. *)
     συνακτικού δέντρου [aexp] με bottom-up τρόπο (δηλαδή από τους
     εσωτερικούς κόμβους προς τους εξωτερικούς). *)
 
-Fixpoint optimize (e : aexp) : aexp (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Fixpoint optimize (e : aexp) : aexp :=
+  match e with
+  | APlus e1 e2 => APlus (optimize e1) (optimize e2)
+  | AMinus e1 e2 => AMinus (optimize e1) (optimize e2)
+  | AMult e1 e2 => AMult (optimize e1) (optimize e2)
+  | _ => simplify e
+  end.
 
 (* [optimize] grade 0/3 *)
 

@@ -141,8 +141,7 @@ Proof.
   (* Coq cannot automatically find an instance for variable y, since
      it doesn't appear in the conclusion. So Coq, when unifying the conclusion
      of [HPQ] with the goal cannot come up with and instance of for [y]. *)
-
-Admitted.
+Abort.
 
 
 Lemma eapply_example2 :
@@ -166,8 +165,12 @@ Lemma eapply_example2' :
     (exists x, P 42 x) ->
     Q 42.
 Proof.
-  (* __ FILL IN HERE __ *)
-Admitted.
+  intros P Q HPQ HP.
+  destruct HP as [x HP].
+  eapply HPQ.
+  eassumption.
+Qed.
+
 
 
 Definition commutative {A} (P : A -> A -> Prop) := forall x y, P x y -> P y x.
@@ -193,8 +196,14 @@ Lemma eexists_example' :
     (exists z, P x z) ->
     (exists z, P z x). 
 Proof.
-  (* __ FILL IN HERE __ *)
-Admitted.
+  intros A x P Hcom HP.
+  destruct HP as [z HP].
+  eexists.
+  apply Hcom.
+  eassumption.
+Qed.
+
+
 
 Lemma eapply_example3 :
   forall (P : nat -> nat -> Prop) (Q : nat -> Prop),
@@ -214,8 +223,12 @@ Lemma eapply_example3' :
     (forall x y : nat, P x y -> Q x) ->
     Q 42.
 Proof.
-  (* __ FILL IN HERE __ *)
-Admitted.
+  intros P Q HP HPQ.
+  eapply HPQ.
+  eapply HP with (z := 17).
+Qed.
+
+  
 
 (** ** Case study: Adding Nondeterministic Choice to [Imp] *)
 
@@ -253,7 +266,7 @@ Module Nondet.
   | CSeq : com -> com -> com
   | CIf : bexp -> com -> com -> com
   | CWhile : bexp -> com -> com
-  (* __ FILL IN HERE __ *).
+  | CAsgnChoice : string -> aexp -> aexp -> com.
 
   (** We redefine the notations and add notations or the new construct *)
   Notation "'skip'" :=
@@ -275,12 +288,11 @@ Module Nondet.
     (CWhile x y)
       (in custom com at level 88, x at level 89,
           y at level 89) : com_scope.
-  (* Uncomment! *)
-  (* Notation "x := y | z" := *)
-  (*   (CAsgnChoice x y z) *)
-  (*     (in custom com at level 0, x constr at level 0, *)
-  (*         y at level 85, z at level 85, *)
-  (*         no associativity) : com_scope. *)
+  Notation "x := y | z" :=
+    (CAsgnChoice x y z)
+      (in custom com at level 0, x constr at level 0,
+          y at level 85, z at level 85,
+          no associativity) : com_scope.
 
   
   (** Step 2: Extend the semantics of [com] *)
@@ -317,7 +329,12 @@ Module Nondet.
       st =[ c ]=> st' ->
       st' =[ while b do c ]=> st'' ->
       st =[ while b do c ]=> st''
-  (* __ FILL IN HERE __ *)
+  | E_AsgnChoice_left : forall st al ar n x,
+      ainterp st al = n ->
+      st =[ x := al | ar ]=> (x !-> n ; st)
+  | E_AsgnChoice_right : forall st al ar n x,
+      ainterp st ar = n ->
+      st =[ x := al | ar ]=> (x !-> n ; st)
                                
   where "st =[ c ]=> st'" := (ceval st c st').
 
@@ -338,6 +355,14 @@ Module Nondet.
     exists (st1 st2 : imp_state),
         st =[ c ]=> st1 /\ st =[ c ]=> st2 /\ different st1 st2.
   Proof.
-  Admitted.
+    exists (<{X := 10 | 15}>).
+
+    intros st.
+    eexists. eexists. repeat split.
+    - eapply E_AsgnChoice_left. reflexivity.
+    - eapply E_AsgnChoice_right. reflexivity.
+    - exists X. intros H. discriminate H.
+Qed.
+    
   
 End Nondet. 
