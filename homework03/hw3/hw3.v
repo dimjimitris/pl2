@@ -97,25 +97,30 @@ Proof.
     {
       repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     }
+    simpl.
     eapply E_WhileTrue; try reflexivity.
     {
       repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     }
+    simpl.
     eapply E_WhileTrue; try reflexivity.
     {
       repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     }
+    simpl.
     eapply E_WhileTrue; try reflexivity.
     {
       repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     }
+    simpl.
     eapply E_WhileTrue; try reflexivity.
     {
       repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     }
-    eapply E_WhileFalse; try reflexivity.
+    simpl.
+    eapply E_WhileFalse; reflexivity.
   }
-  unfold update_st. reflexivity.
+  reflexivity.
 Qed.
 
 (* [FACT_correct] grade 0/7 *)
@@ -154,7 +159,7 @@ Definition simplify (e : aexp) : aexp :=
   | AMult e' (ANum 1) => e'
   | AMult (ANum 0) _ => ANum 0
   | AMult _ (ANum 0) => ANum 0
-  | _ => e
+  | e' => e'
   end.
 
 (* [simplify] grade 0/5 *)
@@ -164,24 +169,26 @@ Definition simplify (e : aexp) : aexp :=
     συνακτικού δέντρου [aexp] με bottom-up τρόπο (δηλαδή από τους
     εσωτερικούς κόμβους προς τους εξωτερικούς). *)
 
-Fixpoint optimize (e : aexp) : aexp (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Fixpoint optimize (e : aexp) : aexp :=
+  match e with
+  | APlus e1 e2 => simplify (APlus (optimize e1) (optimize e2))
+  | AMinus e1 e2 => simplify (AMinus (optimize e1) (optimize e2))
+  | AMult e1 e2 => simplify (AMult (optimize e1) (optimize e2))
+  | e' => simplify e'
+  end.
 
 (* [optimize] grade 0/3 *)
 
 (** Sanity check: Εάν οι παραπάνω ορισμοί είναι σωστοί, τοτε τα παρακάτω tests θα πρέπει να επιτυγχάνουν. *)
 
 Example test_optimize1: (optimize <{ 3 + (X * 1) - 1 * 4 * (1 * Y - 0) }> = <{ 3 + X - 4 * Y }>).
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 Example test_optimize2: (optimize <{ 3 + (X * 1) - Z * (0 * Y + (0 + 0)) }> = <{ 3 + X }>).
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 Example test_optimize3: (optimize <{ (0 + (0 * X + 0)) - Z }> = <{ 0 }>).
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 
 (** Αποδείξτε ότι οι παραπάνω συναρτήσεις είναι σωστές, δηλαδή
@@ -214,8 +221,23 @@ Ltac simpl_arith :=
 Lemma simplify_correct :
   forall (st : imp_state) (e : aexp), ainterp st (simplify e) = ainterp st e.
 Proof.
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros st e.
+  destruct e.
+  - reflexivity.
+  - reflexivity.
+  - simpl.
+    destruct e1 as [n1 | s1 | e1 | e1 | e1]; try destruct n1;
+    destruct e2 as [n2 | s2 | e2 | e2 | e2]; try destruct n2;
+    simpl_arith; reflexivity.
+  - simpl.
+    destruct e1 as [n1 | s1 | e1 | e1 | e1]; try destruct n1;
+    destruct e2 as [n2 | s2 | e2 | e2 | e2]; try destruct n2;
+    simpl_arith; reflexivity.
+  - simpl.
+    destruct e1 as [n1 | s1 | e1 | e1 | e1]; try destruct n1 as [ | n1]; try destruct n1 as [ | n1];
+    destruct e2 as [n2 | s2 | e2 | e2 | e2]; try destruct n2 as [ | n2]; try destruct n2 as [ | n2];
+    simpl_arith; reflexivity.
+Qed.
 
  (* [simplify_correct] grade 0/10 *)
 
@@ -233,8 +255,19 @@ Opaque simplify.
 Lemma optimize_correct :
   forall (st : imp_state) (e : aexp), ainterp st (optimize e) = ainterp st e.
 Proof.
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros st e. induction e.
+  - unfold optimize. apply simplify_correct.
+  - unfold optimize. apply simplify_correct.
+  - simpl.
+    rewrite simplify_correct with (e := <{ (optimize e1) + (optimize e2) }>).
+    simpl. rewrite IHe1. rewrite IHe2. reflexivity.
+  - simpl.
+    rewrite simplify_correct with (e := <{ (optimize e1) - (optimize e2) }>).
+    simpl. rewrite IHe1. rewrite IHe2. reflexivity.
+  - simpl.
+    rewrite simplify_correct with (e := <{ (optimize e1) * (optimize e2) }>).
+    simpl. rewrite IHe1. rewrite IHe2. reflexivity.
+Qed.
 
  (* [optimize_correct] grade 0/7 *)
 
@@ -247,8 +280,14 @@ Transparent simplify.
      αυτoύ του μετασχηματισμού. Χρησιμοποιήστε τον ορισμό [ceval] της
      big-step σημασιολογίας.  *)
 
-Fixpoint optimize_com (c : com) : com (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Fixpoint optimize_com (c : com) : com :=
+  match c with
+  | CSkip => CSkip
+  | CAsgn name val => CAsgn name (optimize val)
+  | CSeq hd tl => CSeq (optimize_com hd) (optimize_com tl)
+  | CIf b c1 c2 => CIf b (optimize_com c1) (optimize_com c2)
+  | CWhile b c => CWhile b (optimize_com c)
+  end.
 
 (* [optimize_com] grade 0/3 *)
 
@@ -257,17 +296,17 @@ Fixpoint optimize_com (c : com) : com (* :=   ___ FILL IN HERE ___. *)
 Example test_optimize_com:
   optimize_com <{ Z := Y + (1 * (X + 1))*0; while (Z <> 0) do { Z := Z * 1 - 1; X := X - 0 + 1 } }> =
   <{ Z := Y; while (Z <> 0) do { Z := Z - 1; X := X + 1 } }>.
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
-
+Proof. simpl. reflexivity. Qed.
 
 Theorem optimize_com_correct :
   forall (st : imp_state) (c : com) (st' : imp_state),
-    (*  ___ FILL IN HERE ___ *)
-    False.
+  st =[ c ]=> st' -> st =[ optimize_com c ]=> st'.
 Proof.
-(*  ___ FILL IN HERE ___ *)
-Admitted.
+  intros st c st' H.
+  induction c.
+  - simpl. assumption.
+  - simpl.
+
 
 (* [optimize_com_correct] grade 0/7 *)
 
