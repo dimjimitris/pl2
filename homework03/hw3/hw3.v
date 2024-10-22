@@ -93,34 +93,32 @@ Proof.
   eexists. repeat split.
   {
     unfold FACT. repeat eapply E_Seq; try apply E_Asgn; try reflexivity.
+
     eapply E_WhileTrue; try reflexivity.
-    {
-      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    }
+    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     simpl.
+
     eapply E_WhileTrue; try reflexivity.
-    {
-      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    }
+    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     simpl.
+
     eapply E_WhileTrue; try reflexivity.
-    {
-      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    }
+    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     simpl.
+
     eapply E_WhileTrue; try reflexivity.
-    {
-      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    }
+    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     simpl.
+
     eapply E_WhileTrue; try reflexivity.
-    {
-      repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    }
+    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
     simpl.
+
     eapply E_WhileFalse; reflexivity.
   }
-  reflexivity.
+  {
+    reflexivity.
+  }
 Qed.
 
 (* [FACT_correct] grade 0/7 *)
@@ -358,7 +356,7 @@ Module ForLoops.
   | CSeq : com -> com -> com
   | CIf : bexp -> com -> com -> com
   | CWhile : bexp -> com -> com
-  (** __ FILL IN HERE __ **)
+  | CFor : com -> bexp -> com -> com -> com
   .
 
   (* [com] grade 0/3 *)
@@ -392,16 +390,10 @@ Module ForLoops.
      σας είναι προαιρετική. Μπορείτε να χρησιμοποιείτε κατευθείαν
      τους constructors του [com]. *)
 
- Notation "'for' i ';' b ';' f 'do' c" :=
- (* Προσοχή!!! Αυτός ο ορισμός είναι λάθος.  *)
-   (CIf b (CSeq i f) c)
-     (in custom com at level 88, b at level 89,
-         i at level 89, f at level 89, c at level 89) : com_scope.
- (* Aφού συμπληρώσετε τους παραπάνω ορισμούς, διαγράψτε τον παραπάνω
-    ορισμό του notation και κάντε uncomment τον παρακάτω κώδικα.*)
- (*   (CFor i b f c) *)
- (*     (in custom com at level 88, b at level 89, *)
- (*         i at level 89, f at level 89, c at level 89) : com_scope. *)
+  Notation "'for' i ';' b ';' f 'do' c" :=
+    (CFor i b f c)
+      (in custom com at level 88, b at level 89,
+          i at level 89, f at level 89, c at level 89) : com_scope.
 
 
  Reserved Notation "st '=[' c ']=>' st'"
@@ -438,14 +430,24 @@ Module ForLoops.
       st =[ c ]=> st' ->
       st' =[ while b do c ]=> st'' ->
       st =[ while b do c ]=> st''
-  (** __ FILL IN HERE __ **)
+  | E_ForFalse : forall i st st' b f c,
+      st =[ i ]=> st' ->
+      binterp st' b = false ->
+      st =[ for i ; b ; f do c ]=> st'
+  | E_ForTrue : forall i st st' st'' st''' st'''' b f c,
+      st =[ i ]=> st' ->
+      binterp st' b = true ->
+      st' =[ c ]=> st'' ->
+      st'' =[ f ]=> st''' ->
+      st''' =[ for skip ; b ; f do c ]=> st'''' ->
+      st =[ for i ; b ; f do c ]=> st''''
+
   where "st =[ c ]=> st'" := (ceval st c st').
 
   (* [ceval] grade 0/10 *)
 
   (** Κάντε uncomment το παρακάτω πρόγραμμα. *)
-  Definition addX5 : com (* := <{ for Z := 0; Z < 5 ; Z := Z + 1 do Y := Y + 1 }>.  *)
-  . Admitted. (* Διαγράψτε αυτή τη γραμμή και κάντε uncomment την από πάνω. *)
+  Definition addX5 : com := <{ for Z := 0; Z < 5 ; Z := Z + 1 do Y := Y + 1 }>.
 
 
   (** Αποδείξτε την παρακάτω προδιαγραφή για το πρόγραμμα [addX5]. Σας
@@ -474,8 +476,54 @@ Module ForLoops.
     forall (st : imp_state),
     exists (st' : imp_state), st =[ addX5 ]=> st' /\ st' Y = st Y + 5.
   Proof.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    intros st.
+    eexists. split.
+    - unfold addX5.
+    {
+      eapply E_ForTrue.
+      constructor. simpl. reflexivity.
+      reflexivity.
+      constructor. simpl. reflexivity.
+      constructor. simpl. reflexivity.
+      repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
+
+
+      eapply E_ForTrue.
+      constructor.
+      reflexivity.
+      constructor. simpl. reflexivity.
+      constructor. simpl. reflexivity.
+      repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
+
+      eapply E_ForTrue.
+      constructor.
+      reflexivity.
+      constructor. simpl. reflexivity.
+      constructor. simpl. reflexivity.
+      repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
+
+      eapply E_ForTrue.
+      constructor.
+      reflexivity.
+      constructor. simpl. reflexivity.
+      constructor. simpl. reflexivity.
+      repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
+
+      eapply E_ForTrue.
+      constructor.
+      reflexivity.
+      constructor. simpl. reflexivity.
+      constructor. simpl. reflexivity.
+      repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
+
+      eapply E_ForFalse.
+      constructor.
+      repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
+      reflexivity.
+    }
+    - repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
+      reflexivity.
+  Qed.
 
   (* [addX5_correct] grade 0/12 *)
 
@@ -523,8 +571,18 @@ Module ForLoops.
         * assumption.
         * assumption.
 
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    - (* E_ForFalse *)
+      inv Heval2.
+      + apply IHHeval1. assumption.
+      + apply IHHeval1 in H4. symmetry in H4. subst. apply IHHeval1. congruence.
+    - (* E_ForTrue *)
+      inv Heval2.
+      + apply IHHeval1_1 in H6. symmetry in H6. subst. congruence.
+      + apply IHHeval1_1 in H4. symmetry in H4. subst. clear H6.
+        apply IHHeval1_2 in H8. symmetry in H8. subst.
+        apply IHHeval1_3 in H9. symmetry in H9. subst.
+        apply IHHeval1_4 in H10. assumption.
+  Qed.      
 
   (* [ceval_deterministic] grade 0/25 *)
 
@@ -553,8 +611,31 @@ Module ForLoops.
     (* κάνουμε επαγωγή στο derivation [Heval] *)
     induction Heval.
 
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq. eapply E_Seq.
+      + apply Heval.
+      + apply E_WhileFalse. assumption.
+    - intros. inv Heq. eapply E_Seq.
+      + apply Heval1.
+      + eapply E_WhileTrue.
+        -- assumption.
+        -- eapply E_Seq. apply Heval2. apply Heval3.
+        -- assert (
+          st''' =[ skip ; while b0 do (c0; f0) ]=> st'''' ->
+          st''' =[ while b0 do (c0; f0) ]=> st''''
+          ).
+          {
+            intros. inv H0. inv H4. assumption.
+          }
+          apply H0. apply IHHeval4. reflexivity.
+  Qed.
+
 
   (* [for_while] grade 0/5 *)
 
@@ -572,8 +653,21 @@ Module ForLoops.
     remember (<{ while b do { c ; f } }> ) as c' eqn:Heq.
     revert b c f Heq.
     induction Heval.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq.
+    - intros. inv Heq. apply E_ForFalse. apply E_Skip. assumption.
+    - intros. inv Heq. inv Heval1. eapply E_ForTrue.
+      + constructor.
+      + assumption.
+      + apply H3.
+      + apply H5.
+      + apply IHHeval2. reflexivity.
+    - intros. inv Heq.
+    - intros. inv Heq.
+  Qed.
 
   (* [while_for_aux] grade 0/4 *)
 
@@ -585,8 +679,17 @@ Module ForLoops.
       st =[ i; while b do { c ; f } ]=> st' ->
       st =[ for i ; b ; f do c ]=> st'.
   Proof.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    intros. inv H. destruct (binterp st'0 b) eqn:Heq.
+    - inv H5. congruence. clear H1. inv H4. eapply E_ForTrue.
+      + apply H3.
+      + apply Heq.
+      + apply H2.
+      + apply H6.
+      + apply while_for_aux; assumption.
+    - inv H5.
+      + apply E_ForFalse; assumption.
+      + congruence.
+  Qed.
 
   (* [while_for] grade 0/1 *)
 
