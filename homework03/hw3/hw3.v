@@ -65,9 +65,9 @@ Lemma SWAP_correct :
 Proof.
   intros st.
   eexists. repeat split.
-  - unfold SWAP. repeat eapply E_Seq; apply E_Asgn; constructor.
-  - repeat simpl. reflexivity.
-  - repeat simpl. reflexivity.
+  - unfold SWAP. repeat eapply E_Seq; apply E_Asgn; repeat simpl; constructor.
+  - reflexivity.
+  - reflexivity.
 Qed.
 
 (* [SWAP_correct] grade 0/3 *)
@@ -424,6 +424,11 @@ Module ForLoops.
       st =[ c ]=> st' ->
       st' =[ while b do c ]=> st'' ->
       st =[ while b do c ]=> st''
+  (** [ for i ; b ; f do c ]:
+      - i: initial com
+      - b: bexp control condition
+      - f: final com (happens after c)
+      - c: com that is the body of the for loop *)
   | E_ForFalse : forall i st st' b f c,
       st =[ i ]=> st' ->
       binterp st' b = false ->
@@ -515,7 +520,7 @@ Module ForLoops.
       repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
       reflexivity.
     }
-    - repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
+    - repeat simplify_state.
       reflexivity.
   Qed.
 
