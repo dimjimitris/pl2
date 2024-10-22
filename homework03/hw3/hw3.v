@@ -66,8 +66,8 @@ Proof.
   intros st.
   eexists. repeat split.
   - unfold SWAP. repeat eapply E_Seq; apply E_Asgn; constructor.
-  - unfold update_st. reflexivity.
-  - unfold update_st. reflexivity.
+  - repeat simpl. reflexivity.
+  - repeat simpl. reflexivity.
 Qed.
 
 (* [SWAP_correct] grade 0/3 *)
@@ -92,27 +92,22 @@ Proof.
   intros st.
   eexists. repeat split.
   {
-    unfold FACT. repeat eapply E_Seq; try apply E_Asgn; try reflexivity.
+    unfold FACT. repeat eapply E_Seq; try apply E_Asgn; try reflexivity. repeat simpl.
 
     eapply E_WhileTrue; try reflexivity.
-    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    simpl.
+    repeat eapply E_Seq; eapply E_Asgn; repeat simpl; reflexivity.
 
     eapply E_WhileTrue; try reflexivity.
-    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    simpl.
+    repeat eapply E_Seq; eapply E_Asgn; repeat simpl; reflexivity.
 
     eapply E_WhileTrue; try reflexivity.
-    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    simpl.
+    repeat eapply E_Seq; eapply E_Asgn; repeat simpl; reflexivity.
 
     eapply E_WhileTrue; try reflexivity.
-    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    simpl.
+    repeat eapply E_Seq; eapply E_Asgn; repeat simpl; reflexivity.
 
     eapply E_WhileTrue; try reflexivity.
-    repeat eapply E_Seq; eapply E_Asgn; reflexivity.
-    simpl.
+    repeat eapply E_Seq; eapply E_Asgn; repeat simpl; reflexivity.
 
     eapply E_WhileFalse; reflexivity.
   }
@@ -300,21 +295,20 @@ Theorem optimize_com_correct :
   forall (st : imp_state) (c : com) (st' : imp_state),
   st =[ c ]=> st' -> st =[ optimize_com c ]=> st'.
 Proof.
-  intros st c st'.
-    intros H.
-    induction H; simpl.
-    - constructor.
-    - constructor. rewrite <- H. apply optimize_correct.
-    - eapply E_Seq.
-      + apply IHceval1.
-      + apply IHceval2.
-    - apply E_IfTrue; assumption.
-    - apply E_IfFalse; assumption.
-    - apply E_WhileFalse. assumption.
-    - simpl in *. eapply E_WhileTrue.
-      + assumption.
-      + apply IHceval1.
-      + apply IHceval2.
+  intros st c st' H.
+  induction H; simpl in *.
+  - constructor.
+  - constructor. rewrite <- H. apply optimize_correct.
+  - eapply E_Seq.
+    + apply IHceval1.
+    + apply IHceval2.
+  - apply E_IfTrue; assumption.
+  - apply E_IfFalse; assumption.
+  - apply E_WhileFalse. assumption.
+  - eapply E_WhileTrue.
+    + assumption.
+    + apply IHceval1.
+    + apply IHceval2.
 Qed.
 
 (* [optimize_com_correct] grade 0/7 *)
@@ -434,13 +428,12 @@ Module ForLoops.
       st =[ i ]=> st' ->
       binterp st' b = false ->
       st =[ for i ; b ; f do c ]=> st'
-  | E_ForTrue : forall i st st' st'' st''' st'''' b f c,
+  | E_ForTrue : forall i st st' st'' st''' b f c,
       st =[ i ]=> st' ->
       binterp st' b = true ->
-      st' =[ c ]=> st'' ->
-      st'' =[ f ]=> st''' ->
-      st''' =[ for skip ; b ; f do c ]=> st'''' ->
-      st =[ for i ; b ; f do c ]=> st''''
+      st' =[ c ; f ]=> st'' ->
+      st'' =[ for skip ; b ; f do c ]=> st''' ->
+      st =[ for i ; b ; f do c ]=> st'''
 
   where "st =[ c ]=> st'" := (ceval st c st').
 
@@ -483,37 +476,38 @@ Module ForLoops.
       eapply E_ForTrue.
       constructor. simpl. reflexivity.
       reflexivity.
-      constructor. simpl. reflexivity.
-      constructor. simpl. reflexivity.
+      eapply E_Seq.
+      apply E_Asgn. simpl. reflexivity.
+      apply E_Asgn. simpl. reflexivity.
       repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
 
 
       eapply E_ForTrue.
-      constructor.
-      reflexivity.
       constructor. simpl. reflexivity.
-      constructor. simpl. reflexivity.
+      eapply E_Seq.
+      apply E_Asgn. simpl. reflexivity.
+      apply E_Asgn. simpl. reflexivity.
       repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
 
       eapply E_ForTrue.
-      constructor.
-      reflexivity.
       constructor. simpl. reflexivity.
-      constructor. simpl. reflexivity.
+      eapply E_Seq.
+      apply E_Asgn. simpl. reflexivity.
+      apply E_Asgn. simpl. reflexivity.
       repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
 
       eapply E_ForTrue.
-      constructor.
-      reflexivity.
       constructor. simpl. reflexivity.
-      constructor. simpl. reflexivity.
+      eapply E_Seq.
+      apply E_Asgn. simpl. reflexivity.
+      apply E_Asgn. simpl. reflexivity.
       repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
 
       eapply E_ForTrue.
-      constructor.
-      reflexivity.
       constructor. simpl. reflexivity.
-      constructor. simpl. reflexivity.
+      eapply E_Seq.
+      apply E_Asgn. simpl. reflexivity.
+      apply E_Asgn. simpl. reflexivity.
       repeat simplify_state. repeat rewrite <- Nat.add_assoc. simpl.
 
       eapply E_ForFalse.
@@ -572,16 +566,17 @@ Module ForLoops.
         * assumption.
 
     - (* E_ForFalse *)
-      inv Heval2.
+      inv Heval2. (* can be either [E_ForFalse] or [E_ForTrue] *)
       + apply IHHeval1. assumption.
-      + apply IHHeval1 in H4. symmetry in H4. subst. apply IHHeval1. congruence.
+      + apply IHHeval1 in H5. symmetry in H5. subst. congruence.
+
     - (* E_ForTrue *)
-      inv Heval2.
+      inv Heval2. (* can be either [E_ForFalse] or [E_ForTrue] *)
       + apply IHHeval1_1 in H6. symmetry in H6. subst. congruence.
-      + apply IHHeval1_1 in H4. symmetry in H4. subst. clear H6.
+      + apply IHHeval1_1 in H5. symmetry in H5. subst. clear H7.
         apply IHHeval1_2 in H8. symmetry in H8. subst.
         apply IHHeval1_3 in H9. symmetry in H9. subst.
-        apply IHHeval1_4 in H10. assumption.
+        reflexivity.
   Qed.      
 
   (* [ceval_deterministic] grade 0/25 *)
@@ -609,31 +604,24 @@ Module ForLoops.
     revert i b c f Heq.
 
     (* κάνουμε επαγωγή στο derivation [Heval] *)
-    induction Heval.
+    induction Heval; intros; inv Heq.
 
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq. eapply E_Seq.
+    - eapply E_Seq.
       + apply Heval.
       + apply E_WhileFalse. assumption.
-    - intros. inv Heq. eapply E_Seq.
+    - eapply E_Seq.
       + apply Heval1.
       + eapply E_WhileTrue.
         -- assumption.
-        -- eapply E_Seq. apply Heval2. apply Heval3.
+        -- apply Heval2.
         -- assert (
-          st''' =[ skip ; while b0 do (c0; f0) ]=> st'''' ->
-          st''' =[ while b0 do (c0; f0) ]=> st''''
+          st'' =[ skip ; while b0 do (c0; f0) ]=> st''' ->
+          st'' =[ while b0 do (c0; f0) ]=> st'''
           ).
           {
             intros. inv H0. inv H4. assumption.
           }
-          apply H0. apply IHHeval4. reflexivity.
+          apply H0. apply IHHeval3. reflexivity.
   Qed.
 
 
@@ -652,21 +640,16 @@ Module ForLoops.
     (* για την επαγωγή ακολουθούμε την ίδια τεχνική με το παραπάνω λήμμα *)
     remember (<{ while b do { c ; f } }> ) as c' eqn:Heq.
     revert b c f Heq.
-    induction Heval.
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq.
-    - intros. inv Heq. apply E_ForFalse. apply E_Skip. assumption.
-    - intros. inv Heq. inv Heval1. eapply E_ForTrue.
+    induction Heval; intros; inv Heq.
+
+    - apply E_ForFalse.
+      + apply E_Skip.
+      + assumption.
+    - eapply E_ForTrue.
       + constructor.
       + assumption.
-      + apply H3.
-      + apply H5.
+      + apply Heval1.
       + apply IHHeval2. reflexivity.
-    - intros. inv Heq.
-    - intros. inv Heq.
   Qed.
 
   (* [while_for_aux] grade 0/4 *)
@@ -680,14 +663,15 @@ Module ForLoops.
       st =[ for i ; b ; f do c ]=> st'.
   Proof.
     intros. inv H. destruct (binterp st'0 b) eqn:Heq.
-    - inv H5. congruence. clear H1. inv H4. eapply E_ForTrue.
-      + apply H3.
-      + apply Heq.
-      + apply H2.
-      + apply H6.
-      + apply while_for_aux; assumption.
     - inv H5.
-      + apply E_ForFalse; assumption.
+      + congruence.
+      + clear H1. eapply E_ForTrue.
+        -- apply H3.
+        -- assumption.
+        -- apply H4.
+        -- apply while_for_aux; assumption.
+    - inv H5.
+      + clear H4. apply E_ForFalse; assumption.
       + congruence.
   Qed.
 
