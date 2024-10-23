@@ -658,14 +658,14 @@ Module ForLoops.
       + eapply E_WhileTrue.
         -- assumption.
         -- apply Heval2.
-        -- assert (
+        -- assert ( HignoreSkip :
           st'' =[ skip ; while b0 do (c0; f0) ]=> st''' ->
           st'' =[ while b0 do (c0; f0) ]=> st'''
           ).
           {
             intros. inv H0. inv H4. assumption.
           }
-          apply H0. apply IHHeval3. reflexivity.
+          apply HignoreSkip. apply IHHeval3. reflexivity.
   Qed.
 
 
