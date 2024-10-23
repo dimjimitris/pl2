@@ -293,26 +293,65 @@ Proof. simpl. reflexivity. Qed.
 
 Theorem optimize_com_correct :
   forall (st : imp_state) (c : com) (st' : imp_state),
-  st =[ c ]=> st' -> st =[ optimize_com c ]=> st'.
+  st =[ c ]=> st' <-> st =[ optimize_com c ]=> st'.
 Proof.
-  intros st c st' H.
-  induction H; simpl in *.
-  - constructor.
-  - constructor. rewrite <- H. apply optimize_correct.
-  - eapply E_Seq.
-    + apply IHceval1.
-    + apply IHceval2.
-  - apply E_IfTrue; assumption.
-  - apply E_IfFalse; assumption.
-  - apply E_WhileFalse. assumption.
-  - eapply E_WhileTrue.
-    + assumption.
-    + apply IHceval1.
-    + apply IHceval2.
+  split; revert st c st'.
+  { (** '->' case *)
+    intros st c st' H.
+    induction H; simpl in *.
+    - constructor.
+    - constructor. rewrite <- H. apply optimize_correct.
+    - eapply E_Seq.
+      + apply IHceval1.
+      + apply IHceval2.
+    - apply E_IfTrue; assumption.
+    - apply E_IfFalse; assumption.
+    - apply E_WhileFalse. assumption.
+    - eapply E_WhileTrue.
+      + assumption.
+      + apply IHceval1.
+      + apply IHceval2.
+  }
+  { (** '<-' case *)
+    intros st c st' H.
+
+    (** Dimitris: I don't recollect if we saw 'remember' in class,
+        but you do use it later in these homework exercises so I
+        guessed it would be okay for me to use too... *)
+    remember (<{ optimize_com c }>) as c' eqn:Heq.
+
+    revert c Heq.
+
+    induction H. (** try congruence relieves us from the cases
+                     where the two sides of Heq don't even represent
+                     the same command/instruction *)
+    - intros. destruct c; simpl in Heq; try congruence. inv Heq.
+      apply E_Skip.
+    - intros. destruct c; simpl in Heq; try congruence. inv Heq.
+      apply E_Asgn. symmetry. apply optimize_correct.
+    - intros. destruct c; simpl in Heq; try congruence. inv Heq.
+      eapply E_Seq.
+      + apply IHceval1. reflexivity.
+      + apply IHceval2. reflexivity.
+    - intros. destruct c; simpl in Heq; try congruence. inv Heq.
+      eapply E_IfTrue.
+      + assumption.
+      + apply IHceval. reflexivity.
+    - intros. destruct c; simpl in Heq; try congruence. inv Heq.
+      eapply E_IfFalse.
+      + assumption.
+      + apply IHceval. reflexivity.
+    - intros. destruct c0; simpl in Heq; try congruence. inv Heq.
+      eapply E_WhileFalse. assumption.
+    - intros. destruct c0; simpl in Heq; try congruence. inv Heq.
+      eapply E_WhileTrue.
+      + assumption.
+      + apply IHceval1. reflexivity.
+      + apply IHceval2. simpl. reflexivity.
+  }
 Qed.
 
 (* [optimize_com_correct] grade 0/7 *)
-
 
 
 (** ** Άσκηση 3: For Loops (50 μονάδες) *)
