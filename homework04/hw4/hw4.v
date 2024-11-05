@@ -5,8 +5,8 @@ Require Import imp hoare.
 Set Warnings "-notation-overriden, -parsing".
 
 (** Στοιχεία Σπουδαστή
-Όνομα:
-ΑΜ:
+Όνομα: ΔΗΜΗΤΡΙΟΣ ΓΕΩΡΓΟΥΣΗΣ
+ΑΜ: 03119005
 *)
 
 
@@ -84,14 +84,28 @@ Set Warnings "-notation-overriden, -parsing".
 Definition BASE := "base".
 Definition EXP := "exp".
 
+Definition FAST_EXP_INV (base exp : nat) : assertion :=
+  fun st => st RES * st BASE ^ st EXP = base ^ exp.
 
-Definition FAST_EXP (base exp : nat) : acom (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition FAST_EXP (base exp : nat) : acom :=
+  <[
+    BASE := base;
+    EXP := exp;
+    RES := 1;
+
+    while 0 < EXP {{ FAST_EXP_INV base exp }} do {
+      if EXP % 2 = 1
+      then RES := RES * BASE
+      else skip;
+
+      EXP := EXP / 2;
+      BASE := BASE * BASE
+    }
+  ]>.
 
 (* [FAST_EXP] grade 0/10 *)
 
-Definition INV (base exp : nat) : assertion (* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Definition INV (base exp : nat) : assertion := FAST_EXP_INV base exp.
 
 (* [INV] grade 0/10 *)
 
@@ -104,16 +118,14 @@ Example FAST_EXP_2_6 :
   | Some st => Some (st RES) (* Get the value of variable [RES] in the state *)
   | None => None
   end = Some 64.
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 Example FAST_EXP_3_4 :
   match cinterp 20 (_ !-> 0) (erase (FAST_EXP 3 4)) with
   | Some st => Some (st RES) (* Get the value of variable [RES] in the state *)
   | None => None
   end = Some 81.
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 (** Η παρακάτω εντολή θα αποτρέψει τους ορισμούς του [modulo] και του [div]
     να γίνουν simplify κατά τη διάρκεια της απόδειξης σας. *)
@@ -142,12 +154,86 @@ Opaque modulo div.
       επιθυμητό postcondition) "στο χαρτί" πριν προχωρήσετε στην
       απόδειξη σε Coq. *)
 
+
+Corollary divmod2 : forall e, e = 2 * (e / 2) + e mod 2.
+Proof.
+  intros. apply Nat.div_mod; lia.
+Qed.
+
+Corollary n_plus_n : forall n, n + n = 2 * n.
+Proof.
+  intros. lia.
+Qed.
+
+Corollary n_square_m : forall n m, (n * n) ^ m = n ^ (2 * m).
+Proof.
+  intros. simpl. rewrite Nat.add_0_r.
+  assert (n * n = n ^ 2). simpl. lia.
+  rewrite H.
+  rewrite <- Nat.pow_mul_r.
+  simpl. rewrite Nat.add_0_r. reflexivity.
+Qed.
+
 Theorem FAST_EXP_CORRECT (base exp : nat) :
   {{ fun _ => True }} erase (FAST_EXP base exp) {{ fun st => st RES = pow base exp }}.
 Proof.
-(*  ___ FILL IN HERE ___ *)
-Admitted.
-
+  apply verify_triple.
+  {
+    repeat split.
+    - intros Hmod.
+      destruct H as [Hinv Hcond].
+      unfold assertion_sub. simpl.
+      unfold FAST_EXP_INV in *.
+      unfold_all. simpl in *.
+      apply Nat.eqb_eq in Hmod.
+      apply Nat.ltb_lt in Hcond.
+      remember (divmod2 (st EXP)) as Hexp. clear HeqHexp.
+      rewrite Hmod in Hexp.
+      rewrite Hexp in Hinv.
+      rewrite Nat.add_comm in Hinv. simpl in Hinv. rewrite Nat.add_0_r in Hinv.
+      rewrite n_plus_n with (n := st EXP / 2) in Hinv.
+      rewrite <- n_square_m with (n := st BASE) in Hinv.
+      rewrite Nat.mul_assoc in Hinv.
+      assumption.
+    - intros Hmod.
+      destruct H as [Hinv Hcond].
+      unfold assertion_sub. simpl.
+      unfold FAST_EXP_INV in *.
+      unfold_all. simpl in *.
+      apply Nat.eqb_neq in Hmod.
+      apply Nat.ltb_lt in Hcond.
+      assert (Hmode : forall e, e mod 2 <> 1 <-> e mod 2 = 0). {
+        intros. split; intros.
+        - assert (e mod 2 < 2). apply Nat.mod_upper_bound. lia.
+          lia.
+        - lia.  
+      }
+      rewrite Hmode in Hmod. clear Hmode.
+      remember (divmod2 (st EXP)) as Hexp. clear HeqHexp.
+      rewrite Hmod in Hexp.
+      rewrite Nat.add_0_r in Hexp.
+      rewrite Hexp in Hinv.
+      rewrite <- n_square_m with (n := st BASE) in Hinv.
+      assumption.
+    - intros st Hinv.
+      destruct Hinv as [Hinv Hcond].
+      unfold FAST_EXP_INV in *.
+      unfold_all. simpl in *.
+      apply Nat.ltb_ge in Hcond.
+      assert (Hcexp : st EXP = 0). lia. clear Hcond.
+      rewrite Hcexp in Hinv.
+      rewrite Nat.pow_0_r in Hinv.
+      rewrite <- Hinv.
+      lia.
+  }
+  {
+    intros st _.
+    simpl. unfold assertion_sub. simpl.
+    unfold FAST_EXP_INV. simpl.
+    unfold update_st. simpl.
+    lia.
+  }
+Qed.
 
 (* [FAST_EXP_CORRECT] grade 0/30 *)
 
