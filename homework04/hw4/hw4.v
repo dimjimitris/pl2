@@ -154,7 +154,6 @@ Opaque modulo div.
       επιθυμητό postcondition) "στο χαρτί" πριν προχωρήσετε στην
       απόδειξη σε Coq. *)
 
-
 Corollary divmod2 : forall e, e = 2 * (e / 2) + e mod 2.
 Proof.
   intros. apply Nat.div_mod; lia.
@@ -234,6 +233,7 @@ Proof.
     lia.
   }
 Qed.
+
 
 (* [FAST_EXP_CORRECT] grade 0/30 *)
 
@@ -470,10 +470,10 @@ Module RequireAssert.
       {{ P }} c {{ Q }}
   | H_Assert :
     forall (P : assertion) (b : bexp),
-      {{ P AND (TRUE b) }} <{ assert b }> {{ P AND (TRUE b) }}
+      {{ P AND (TRUE b) }} <{ assert b }> {{ P AND (TRUE b)}}
   | H_Require :
     forall (P : assertion) (b : bexp),
-      {{ FALSE b }} <{ require b }> {{ P AND (FALSE b) }}
+      {{ P }} <{ require b }> {{ P AND (TRUE b) }}
 
   where "{{ P }} c {{ Q }}" := (triple P c Q) : hoare_spec_scope.
 
@@ -485,27 +485,26 @@ Module RequireAssert.
     forall Q, {{ fun _ => True }} require false {{ Q }}.
   Proof.
     intros Q.
-    eapply H_PreStrengthening.
-    - eapply H_PostWeakening.
-      + apply H_Require.
-      + intros st H. inv H. apply H0.
-    - intros st H. unfold FALSE. reflexivity.
+    remember (fun _ => True) as P.
+    eapply H_PreStrengthening; try eapply H_PostWeakening.
+    - apply H_Require.
+    - intros st H. destruct H as [H1 H2]. discriminate.
+    - intros st H. apply HeqP.
   Qed.
-    
+
   (* [require_example] grade 0/3 *)
 
   Example assert_example :
     {{ fun st => st X = 42 }} assert (X = 42) {{ fun _ => True }}.
   Proof.
-    remember (fun st => st X = 42) as P.
-    remember (fun _ => True) as Q.
-    eapply H_PreStrengthening.
-    - eapply H_PostWeakening.
-      + apply H_Assert.
-      + intros st H. destruct H as [H H']. apply H.
+    remember (fun _ => True) as P.
+    remember (fun st => st X = 42) as Q.
+    eapply H_PreStrengthening; try eapply H_PostWeakening.
+    - apply H_Assert.
+    - intros st H. rewrite HeqP. reflexivity.
     - intros st H. split.
-      + rewrite HeqQ. reflexivity.
-      + unfold TRUE. unfold binterp. simpl. apply Nat.eqb_eq. assumption.
+      + apply HeqP.
+      + unfold TRUE. simpl. apply Nat.eqb_eq. assumption.
   Qed.
 
   (* [assert_example] grade 0/3 *)
@@ -517,15 +516,25 @@ Module RequireAssert.
       assert (42 < Z)
     {{ fun _ => True }}.
   Proof.
-    eapply H_PreStrengthening; try eapply H_PostWeakening.
+    remember (fun _ => True) as P.
+    eapply H_PreStrengthening;
+    try eapply H_PostWeakening;
     repeat eapply H_Seq.
     - apply H_Assert.
     - apply H_Asgn.
     - eapply H_PostWeakening.
       + apply H_Require.
-      + intros st H. inv H.
-
-         
+      + intros st H. destruct H as [H1 H2]. unfold assertion_sub. simpl.
+        split.
+        * apply H1.
+        * unfold TRUE in *. simpl in *. apply Nat.ltb_lt.
+          apply andb_prop in H2. destruct H2 as [H2 H3]. apply Nat.ltb_lt in H2, H3.
+          unfold update_st. simpl. lia.
+    - intros st H. rewrite HeqP. reflexivity.
+    - intros st H.
+      remember ((Z !-> st X + st Y; st)) as st'.
+      apply HeqP.
+  Qed.
 
   (* [require_assert] grade 0/4 *)
 
@@ -573,8 +582,16 @@ Module RequireAssert.
       inv H. eauto.
     - edestruct IHHtriple; [ eassumption | hoare_auto | ].
       inv H. eauto.
-      (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    - inv Heval.
+      + exists st1. split.
+        * reflexivity.
+        * assumption.
+      + unfold assert_and in HP. destruct HP as [HP1 HP2].
+        unfold TRUE in HP2. congruence.
+    - inv Heval. exists st1. split.
+      + reflexivity.
+      + hoare_auto.
+  Qed.
 
   (* [hoare_triple_sound] grade 0/8 *)
 
