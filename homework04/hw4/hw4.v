@@ -352,7 +352,16 @@ Module RequireAssert.
       binterp st b = true ->
       st =[ c ]=> Error ->
       st =[ while b do c ]=> Error
-  (*  ___ FILL IN HERE ___ *)
+  | E_AssertTrue : forall st b,
+      binterp st b = true ->
+      st =[ assert b ]=> Success st
+  | E_AssertFalse : forall st b,
+      binterp st b = false ->
+      st =[ assert b ]=> Error
+  | E_Require : forall st b,
+      binterp st b = true ->
+      st =[ require b ]=> Success st
+  (** Δεν υπάρχει κανόνας για το: | E_RequireFalse : ... *)
 
   where "st =[ c ]=> st'" := (ceval st c st').
 
@@ -365,32 +374,46 @@ Module RequireAssert.
   Example eval_require_false :
     forall st, ~ exists st', st =[ X := 42; require (X < 11) ]=> st'.
   Proof.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    intros st H.
+    destruct H as [st' H].
+    inv H.
+    - inv H3.
+      inv H5. unfold update_st in H1. simpl in H1. rewrite Nat.ltb_lt in H1. lia.
+    - inv H4.
+  Qed.
 
   (* [eval_require_false] grade 0/3 *)
 
   Example eval_assert_false :
     forall st, st =[ X := 42; assert (X < 11) ]=> Error.
   Proof.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    intros st.
+    eapply E_Seq_Success.
+    - apply E_Asgn. simpl. reflexivity.
+    - apply E_AssertFalse. reflexivity.
+  Qed.
 
   (* [eval_assert_false] grade 0/3 *)
 
   Lemma require_true :
     forall c st res, st =[ c ]=> res -> st =[ require true; c ]=> res.
   Proof.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    intros.
+    eapply E_Seq_Success.
+    - apply E_Require. reflexivity.
+    - assumption.
+  Qed.
 
   (* [require_true] grade 0/3 *)
 
   Lemma assert_true :
     forall c st st', st =[ c ]=> Success st' -> st =[ c; assert true ]=> Success st'.
   Proof.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    intros.
+    eapply E_Seq_Success.
+    - apply H.
+    - apply E_AssertTrue. reflexivity.
+  Qed.
 
   (* [assert_true] grade 0/3 *)
 
@@ -445,7 +468,12 @@ Module RequireAssert.
       {{ P' }} c {{ Q }} ->
       (P ->> P') -> (* strengthening of the precondintion *)
       {{ P }} c {{ Q }}
-  (*  ___ FILL IN HERE ___ *)
+  | H_Assert :
+    forall (P : assertion) (b : bexp),
+      {{ P AND (TRUE b) }} <{ assert b }> {{ P AND (TRUE b) }}
+  | H_Require :
+    forall (P : assertion) (b : bexp),
+      {{ FALSE b }} <{ require b }> {{ P AND (FALSE b) }}
 
   where "{{ P }} c {{ Q }}" := (triple P c Q) : hoare_spec_scope.
 
@@ -456,16 +484,29 @@ Module RequireAssert.
   Example require_example :
     forall Q, {{ fun _ => True }} require false {{ Q }}.
   Proof.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
-
+    intros Q.
+    eapply H_PreStrengthening.
+    - eapply H_PostWeakening.
+      + apply H_Require.
+      + intros st H. inv H. apply H0.
+    - intros st H. unfold FALSE. reflexivity.
+  Qed.
+    
   (* [require_example] grade 0/3 *)
 
   Example assert_example :
     {{ fun st => st X = 42 }} assert (X = 42) {{ fun _ => True }}.
   Proof.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    remember (fun st => st X = 42) as P.
+    remember (fun _ => True) as Q.
+    eapply H_PreStrengthening.
+    - eapply H_PostWeakening.
+      + apply H_Assert.
+      + intros st H. destruct H as [H H']. apply H.
+    - intros st H. split.
+      + rewrite HeqQ. reflexivity.
+      + unfold TRUE. unfold binterp. simpl. apply Nat.eqb_eq. assumption.
+  Qed.
 
   (* [assert_example] grade 0/3 *)
 
@@ -476,8 +517,15 @@ Module RequireAssert.
       assert (42 < Z)
     {{ fun _ => True }}.
   Proof.
-    (*  ___ FILL IN HERE ___ *)
-  Admitted.
+    eapply H_PreStrengthening; try eapply H_PostWeakening.
+    repeat eapply H_Seq.
+    - apply H_Assert.
+    - apply H_Asgn.
+    - eapply H_PostWeakening.
+      + apply H_Require.
+      + intros st H. inv H.
+
+         
 
   (* [require_assert] grade 0/4 *)
 
