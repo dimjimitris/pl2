@@ -20,11 +20,12 @@ lemma pow_lemma(x: nat, n: nat)
   if n == 0 {
 
   } else {
-    pow_lemma(x, n - 1); // use IH
+    pow_lemma(x, n - 1); // use the IH
   }
 }
 
 method FastExponentiation(a: nat, n: nat) returns (res: nat)
+// ensures that the result is correct with respect to the functional specification [pow]
 ensures res == pow(a, n) 
 {
   var base := a;
@@ -39,7 +40,7 @@ ensures res == pow(a, n)
     if exp % 2 == 1 {
       res := res * base;
     }
-    
+
     base := base * base;
     exp := exp / 2;
   }
