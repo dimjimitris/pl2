@@ -154,25 +154,6 @@ Opaque modulo div.
       επιθυμητό postcondition) "στο χαρτί" πριν προχωρήσετε στην
       απόδειξη σε Coq. *)
 
-Corollary divmod2 : forall e, e = 2 * (e / 2) + e mod 2.
-Proof.
-  intros. apply Nat.div_mod; lia.
-Qed.
-
-Corollary n_plus_n : forall n, n + n = 2 * n.
-Proof.
-  intros. lia.
-Qed.
-
-Corollary n_square_m : forall n m, (n * n) ^ m = n ^ (2 * m).
-Proof.
-  intros. simpl. rewrite Nat.add_0_r.
-  assert (n * n = n ^ 2). simpl. lia.
-  rewrite H.
-  rewrite <- Nat.pow_mul_r.
-  simpl. rewrite Nat.add_0_r. reflexivity.
-Qed.
-
 Theorem FAST_EXP_CORRECT (base exp : nat) :
   {{ fun _ => True }} erase (FAST_EXP base exp) {{ fun st => st RES = pow base exp }}.
 Proof.
@@ -186,12 +167,12 @@ Proof.
       unfold_all. simpl in *.
       apply Nat.eqb_eq in Hmod.
       apply Nat.ltb_lt in Hcond.
-      remember (divmod2 (st EXP)) as Hexp. clear HeqHexp.
+      remember (Nat.div_mod_eq (st EXP) 2) as Hexp eqn: H'; clear H'.
       rewrite Hmod in Hexp.
       rewrite Hexp in Hinv.
       rewrite Nat.add_comm in Hinv. simpl in Hinv. rewrite Nat.add_0_r in Hinv.
-      rewrite n_plus_n with (n := st EXP / 2) in Hinv.
-      rewrite <- n_square_m with (n := st BASE) in Hinv.
+      rewrite Nat.pow_add_r in Hinv.
+      rewrite <- Nat.pow_mul_l in Hinv.
       rewrite Nat.mul_assoc in Hinv.
       assumption.
     - intros Hmod.
@@ -208,11 +189,13 @@ Proof.
         - lia.  
       }
       rewrite Hmode in Hmod. clear Hmode.
-      remember (divmod2 (st EXP)) as Hexp. clear HeqHexp.
+      remember (Nat.div_mod_eq (st EXP) 2) as Hexp eqn: H'; clear H'.
       rewrite Hmod in Hexp.
       rewrite Nat.add_0_r in Hexp.
-      rewrite Hexp in Hinv.
-      rewrite <- n_square_m with (n := st BASE) in Hinv.
+      rewrite Hexp in Hinv. simpl in Hinv.
+      rewrite Nat.add_0_r in Hinv.
+      rewrite Nat.pow_add_r in Hinv.
+      rewrite <- Nat.pow_mul_l in Hinv.
       assumption.
     - intros st Hinv.
       destruct Hinv as [Hinv Hcond].
