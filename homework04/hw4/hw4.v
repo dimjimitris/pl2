@@ -583,12 +583,16 @@ Module RequireAssert.
     - edestruct IHHtriple; [ eassumption | hoare_auto | ].
       inv H. eauto.
     - inv Heval.
-      + exists st1. split.
+      + (* Success state *)
+        exists st1. split.
         * reflexivity.
         * assumption.
-      + unfold assert_and in HP. destruct HP as [HP1 HP2].
+      + (* Error state *)
+        unfold assert_and in HP. destruct HP as [HP1 HP2].
         unfold TRUE in HP2. congruence.
-    - inv Heval. exists st1. split.
+    - inv Heval.
+      (* only success state exists *)
+      exists st1. split.
       + reflexivity.
       + hoare_auto.
   Qed.
