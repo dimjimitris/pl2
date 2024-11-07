@@ -479,68 +479,6 @@ Module RequireAssert.
 
   (* [triple] grade 0/10 *)
 
-  Create HintDb hoareDB.
-
-  (** We add all the constructors of [triple] to the database, so [auto]
-      can apply them automatically. *)
-
-  Hint Constructors triple : hoareDB.
-
-  (** Let's define a tactic to perform all the unfold that we usually do
-      in a Hoare triple proof. *)
-
-  Ltac unfold_all :=
-    unfold assert_implies, assertion_sub,
-      binterp, update_st, TRUE, FALSE, assert_and in *.
-
-  (** And a tactic to simplify the environment during a proof. *)
-  Ltac simplify_env :=
-    match goal with
-    | [ H : _ /\ _ |- _] => destruct H
-    (* Patterns for binterp: the following can be obtained by some
-      hypothesis of the form [binterp st b = true] or [binterp st b =
-      false]. We apply the necessary lemma to make it a logical
-      proposition rather than a boolean connective *)
-    | [ H : false = true |- _ ] => discriminate
-    | [ H : true = false |- _ ] => discriminate
-    | [ H : _ =? _ = true |- _ ] => apply PeanoNat.Nat.eqb_eq in H
-    | [ H : _ =? _ = false |- _ ] => apply PeanoNat.Nat.eqb_neq in H
-    | [ H : _ <=? _ = true |- _ ] => apply Compare_dec.leb_complete in H
-    | [ H : _ <=? _ = false |- _ ] => apply Compare_dec.leb_complete_conv in H
-    | [ H : _ <? _ = true |- _ ] => apply PeanoNat.Nat.ltb_lt in H
-    | [ H : _ <? _ = false |- _ ] => apply PeanoNat.Nat.ltb_ge in H
-    | [ H : negb _  = true |- _ ] => apply Bool.negb_true_iff in H
-    | [ H : negb _ = false |- _ ] => apply Bool.negb_false_iff in H
-    | [ H : (_ && _)%bool = true |- _ ] => apply Bool.andb_true_iff in H
-    | [ H : (_ || _)%bool = false |- _ ] => apply Bool.orb_false_elim in H
-    (* Rewrites with an hypothesis of the form [st some_var = some_term] or
-        [some_term = st some_var]. *)
-    | [ st : imp_state |- _] =>
-        match goal with
-        | [H : st _ = _ |- _] =>
-            rewrite -> H in *; clear H
-        | [H : _ = st _ |- _] =>
-            rewrite <- H in *; clear H
-        end
-    end.
-
-  (** We can use a command of the form [Hint Extern number pattern =>
-      ltac_expr : hintdb] to extend auto with tactics other than apply.
-      [number] is a cost that we can assign to each operation, [pattern]
-      is the pattern that should be matched in order of the tactic
-      [ltac_expr] to be applied, and [hintdb] the hind database we want
-      to add this hint to. [auto] will try to apply such hints at each
-      step of the search. We add a few of these hints. *)
-
-  Hint Extern 2 (_ = _) => lia : hoareDB.
-  Hint Extern 2 (_ <= _) => lia : hoareDB.
-  Hint Extern 2 (_ >= _) => lia : hoareDB.
-  Hint Extern 2 => simpl in *: hoareDB.
-  Hint Extern 2 => unfold_all : hoareDB.
-  Hint Extern 2 => repeat simplify_env : hoareDB.
-
-  Ltac hoare_auto := eauto with hoareDB.
-
   (** Για να ελέγξετε τους ορισμούς σας, αποδείξτε τα παρακάτω Hoare triples. *)
 
   Example require_example :
