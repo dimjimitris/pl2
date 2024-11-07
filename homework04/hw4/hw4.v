@@ -546,10 +546,9 @@ Module RequireAssert.
   Example require_example :
     forall Q, {{ fun _ => True }} require false {{ Q }}.
   Proof.
-    intros Q.
-    eapply H_PostWeakening.
-    - apply H_Require.
-    - intros st H. destruct H as [H1 H2]. discriminate.
+    intros.
+    econstructor; try constructor.
+    intros st H. destruct H as [_ H]. discriminate.
   Qed.
 
   (* [require_example] grade 0/3 *)
@@ -557,14 +556,11 @@ Module RequireAssert.
   Example assert_example :
     {{ fun st => st X = 42 }} assert (X = 42) {{ fun _ => True }}.
   Proof.
-    remember (fun _ => True) as P.
-    eapply H_PreStrengthening;
-    try eapply H_PostWeakening.
-    - apply H_Assert.
-    - intros st H. rewrite HeqP. reflexivity.
-    - intros st H. split.
-      + apply HeqP.
-      + unfold TRUE. simpl. apply Nat.eqb_eq. assumption.
+    remember (fun _ => True) as P eqn:HeqP.
+    econstructor; try eapply H_PreStrengthening; try constructor.
+    - apply HeqP.
+    - hoare_auto.
+    - intros st _. rewrite HeqP. reflexivity.
   Qed.
 
   (* [assert_example] grade 0/3 *)
@@ -576,24 +572,19 @@ Module RequireAssert.
       assert (42 < Z)
     {{ fun _ => True }}.
   Proof.
-    remember (fun _ => True) as P.
-    eapply H_PreStrengthening;
-    try eapply H_PostWeakening;
-    repeat eapply H_Seq.
-    - apply H_Assert.
-    - apply H_Asgn.
-    - eapply H_PostWeakening.
-      + apply H_Require.
-      + intros st H. destruct H as [H1 H2]. unfold assertion_sub. simpl.
-        split.
-        * apply H1.
-        * unfold TRUE in *. simpl in *. apply Nat.ltb_lt.
-          apply andb_prop in H2. destruct H2 as [H2 H3]. apply Nat.ltb_lt in H2, H3.
-          unfold update_st. simpl. lia.
-    - intros st H. rewrite HeqP. reflexivity.
-    - intros st H.
-      remember ((Z !-> st X + st Y; st)) as st'.
-      apply HeqP.
+    remember (fun _ => True) as P eqn:HeqP.
+    econstructor;
+    econstructor;
+    repeat constructor.
+    - econstructor.
+      + apply H_Assert.
+      + intros st H. rewrite HeqP. reflexivity.
+    - intros st H. unfold assertion_sub, TRUE in *. simpl in *. split.
+      + remember ((Z !-> st X + st Y; st)) as st'. apply HeqP.
+      + destruct H as [_ H]. apply andb_prop in H.
+        destruct H as [H1 H2]. simpl in *.
+        apply Nat.ltb_lt. apply Nat.ltb_lt in H1, H2.
+        hoare_auto.
   Qed.
 
   (* [require_assert] grade 0/4 *)
@@ -644,17 +635,12 @@ Module RequireAssert.
       inv H. eauto.
     - inv Heval.
       + (* Success state *)
-        exists st1. split.
-        * reflexivity.
-        * assumption.
+        exists st1. split; hoare_auto.
       + (* Error state *)
-        unfold assert_and in HP. destruct HP as [HP1 HP2].
-        unfold TRUE in HP2. congruence.
+        destruct HP as [_ HP]. congruence.
     - inv Heval.
       (* only success state exists *)
-      exists st1. split.
-      + reflexivity.
-      + hoare_auto.
+      exists st1. split; hoare_auto.
   Qed.
 
   (* [hoare_triple_sound] grade 0/8 *)
