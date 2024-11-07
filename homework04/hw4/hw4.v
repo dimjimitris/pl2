@@ -9,7 +9,6 @@ Set Warnings "-notation-overriden, -parsing".
 ΑΜ: 03119005
 *)
 
-
 (** * Εργασία 4 (100 μονάδες + 30 μονάδες bonus) *)
 
 (** Ο σκοπός αυτής της εργασίας είναι να εξοικειωθείτε με την
@@ -43,7 +42,6 @@ Set Warnings "-notation-overriden, -parsing".
 
     - Συμπληρώστε σωστά τα στοιχεία σας στην αρχή του αρχείου. Αυτό
       είναι απαραίτητο για τη σωστή βαθμολόγηση των εργασιών. *)
-
 
 (** ** Άσκηση 1: Επαναλαμβανόμενος τετραγωνισμός στην Imp (50 μονάδες) *)
 
@@ -80,12 +78,13 @@ Set Warnings "-notation-overriden, -parsing".
     (mod). Μπορείτε να δείτε τη σημασιολογία τους αλλά και τα
     notations τους στο αρχείο imp.v. *)
 
-
 Definition BASE := "base".
 Definition EXP := "exp".
 
-Definition FAST_EXP_INV (base exp : nat) : assertion :=
+Definition INV (base exp : nat) : assertion :=
   fun st => st RES * st BASE ^ st EXP = base ^ exp.
+
+(* [INV] grade 0/10 *)
 
 Definition FAST_EXP (base exp : nat) : acom :=
   <[
@@ -93,7 +92,7 @@ Definition FAST_EXP (base exp : nat) : acom :=
     EXP := exp;
     RES := 1;
 
-    while 0 < EXP {{ FAST_EXP_INV base exp }} do {
+    while 0 < EXP {{ INV base exp }} do {
       if EXP % 2 = 1
       then RES := RES * BASE
       else skip;
@@ -104,11 +103,6 @@ Definition FAST_EXP (base exp : nat) : acom :=
   ]>.
 
 (* [FAST_EXP] grade 0/10 *)
-
-Definition INV (base exp : nat) : assertion := FAST_EXP_INV base exp.
-
-(* [INV] grade 0/10 *)
-
 
 (** Sanity check: Εάν οι παραπάνω ορισμοί είναι σωστοί, τότε τα
     παρακάτω tests θα πρέπει να επιτυγχάνουν. *)
@@ -159,15 +153,13 @@ Theorem FAST_EXP_CORRECT (base exp : nat) :
 Proof.
   apply verify_triple.
   {
-    repeat split.
-    - intros Hmod.
-      destruct H as [Hinv Hcond].
-      unfold assertion_sub. simpl.
-      unfold FAST_EXP_INV in *.
-      unfold_all. simpl in *.
-      apply Nat.eqb_eq in Hmod.
-      apply Nat.ltb_lt in Hcond.
-      remember (Nat.div_mod_eq (st EXP) 2) as Hexp eqn: H'; clear H'.
+    repeat split; [intros Hmod | intros Hmod | intros st H];
+      destruct H as [Hinv Hcond];
+      unfold assertion_sub; simpl;
+      unfold INV in *;
+      unfold_all; simpl in *;
+      simplify_env.
+    - remember (Nat.div_mod_eq (st EXP) 2) as Hexp eqn: H'; clear H'.
       rewrite Hmod in Hexp.
       rewrite Hexp in Hinv.
       rewrite Nat.add_comm in Hinv. simpl in Hinv. rewrite Nat.add_0_r in Hinv.
@@ -175,16 +167,9 @@ Proof.
       rewrite <- Nat.pow_mul_l in Hinv.
       rewrite Nat.mul_assoc in Hinv.
       assumption.
-    - intros Hmod.
-      destruct H as [Hinv Hcond].
-      unfold assertion_sub. simpl.
-      unfold FAST_EXP_INV in *.
-      unfold_all. simpl in *.
-      apply Nat.eqb_neq in Hmod.
-      apply Nat.ltb_lt in Hcond.
-      assert (Hmode : forall e, e mod 2 <> 1 <-> e mod 2 = 0). {
+    - assert (Hmode : forall e, e mod 2 <> 1 <-> e mod 2 = 0). {
         intros. split; intros.
-        - assert (e mod 2 < 2). apply Nat.mod_upper_bound. lia.
+        - assert (e mod 2 < 2). { apply Nat.mod_upper_bound. lia. }
           lia.
         - lia.  
       }
@@ -197,12 +182,7 @@ Proof.
       rewrite Nat.pow_add_r in Hinv.
       rewrite <- Nat.pow_mul_l in Hinv.
       assumption.
-    - intros st Hinv.
-      destruct Hinv as [Hinv Hcond].
-      unfold FAST_EXP_INV in *.
-      unfold_all. simpl in *.
-      apply Nat.ltb_ge in Hcond.
-      assert (Hcexp : st EXP = 0). lia. clear Hcond.
+    - assert (Hcexp : st EXP = 0). lia. clear Hcond.
       rewrite Hcexp in Hinv.
       rewrite Nat.pow_0_r in Hinv.
       rewrite <- Hinv.
@@ -211,15 +191,13 @@ Proof.
   {
     intros st _.
     simpl. unfold assertion_sub. simpl.
-    unfold FAST_EXP_INV. simpl.
+    unfold INV. simpl.
     unfold update_st. simpl.
     lia.
   }
 Qed.
 
-
 (* [FAST_EXP_CORRECT] grade 0/30 *)
-
 
 (** ** Άσκηση 2: Require and Assert (50 μονάδες) *)
 
@@ -350,7 +328,6 @@ Module RequireAssert.
 
   (* [ceval] grade 0/10 *)
 
-
   (** Εάν ο ορισμός της σημασιολογίας είναι σωστός, θα πρέπει να
       μπορείτε να αποδείξετε τα παρακάτω λήμματα. *)
 
@@ -360,8 +337,7 @@ Module RequireAssert.
     intros st H.
     destruct H as [st' H].
     inv H.
-    - inv H3.
-      inv H5. unfold update_st in H1. simpl in H1. rewrite Nat.ltb_lt in H1. lia.
+    - inv H3. inv H5. inv H1.
     - inv H4.
   Qed.
 
@@ -371,9 +347,7 @@ Module RequireAssert.
     forall st, st =[ X := 42; assert (X < 11) ]=> Error.
   Proof.
     intros st.
-    eapply E_Seq_Success.
-    - apply E_Asgn. simpl. reflexivity.
-    - apply E_AssertFalse. reflexivity.
+    do 2 econstructor; reflexivity.
   Qed.
 
   (* [eval_assert_false] grade 0/3 *)
@@ -382,9 +356,7 @@ Module RequireAssert.
     forall c st res, st =[ c ]=> res -> st =[ require true; c ]=> res.
   Proof.
     intros.
-    eapply E_Seq_Success.
-    - apply E_Require. reflexivity.
-    - assumption.
+    econstructor; [ constructor | assumption ]. reflexivity.
   Qed.
 
   (* [require_true] grade 0/3 *)
@@ -393,13 +365,10 @@ Module RequireAssert.
     forall c st st', st =[ c ]=> Success st' -> st =[ c; assert true ]=> Success st'.
   Proof.
     intros.
-    eapply E_Seq_Success.
-    - apply H.
-    - apply E_AssertTrue. reflexivity.
+    econstructor; [ eassumption | constructor ]. reflexivity.
   Qed.
 
   (* [assert_true] grade 0/3 *)
-
 
   (** Στη συνέχεια ορίζουμε κανόνες λογικής Hoare για την επέκταση της
       Imp.  Η σημασιολογία μιας τρίπλας [{{ P }} c {{ Q }}] είναι η
@@ -462,13 +431,18 @@ Module RequireAssert.
 
   (* [triple] grade 0/10 *)
 
+  (** We add all the constructors of [triple] to the database, so [auto]
+      can apply them automatically. *)
+
+  Hint Constructors triple : hoareDB.
+
   (** Για να ελέγξετε τους ορισμούς σας, αποδείξτε τα παρακάτω Hoare triples. *)
 
   Example require_example :
     forall Q, {{ fun _ => True }} require false {{ Q }}.
   Proof.
     intros.
-    econstructor; try constructor.
+    econstructor; [ constructor | ].
     intros st H. destruct H as [_ H]. discriminate.
   Qed.
 
@@ -478,9 +452,9 @@ Module RequireAssert.
     {{ fun st => st X = 42 }} assert (X = 42) {{ fun _ => True }}.
   Proof.
     remember (fun _ => True) as P eqn:HeqP.
-    econstructor; try eapply H_PreStrengthening; try constructor.
+    econstructor; [ eapply H_PreStrengthening; constructor | ].
     - apply HeqP.
-    - hoare_auto.
+    - unfold TRUE. simpl. apply Nat.eqb_eq. assumption.  
     - intros st _. rewrite HeqP. reflexivity.
   Qed.
 
@@ -494,8 +468,7 @@ Module RequireAssert.
     {{ fun _ => True }}.
   Proof.
     remember (fun _ => True) as P eqn:HeqP.
-    econstructor;
-    econstructor;
+    do 2 econstructor;
     repeat constructor.
     - econstructor.
       + apply H_Assert.
@@ -505,7 +478,7 @@ Module RequireAssert.
       + destruct H as [_ H]. apply andb_prop in H.
         destruct H as [H1 H2]. simpl in *.
         apply Nat.ltb_lt. apply Nat.ltb_lt in H1, H2.
-        hoare_auto.
+        unfold update_st. simpl. lia.
   Qed.
 
   (* [require_assert] grade 0/4 *)
