@@ -148,11 +148,96 @@ Inductive value : Type :=
 
 Definition environment : Type := var_map value.
 
+(** Χρειαζόμαστε βοηθητική συνάρτηση *)
+
+Definition tuple_aux {A} {B} (f : A -> option B) (l : list A) :=
+  let mapped := map f l in
+  match existsb (
+    fun el => match el with
+    | Some _ => true
+    | None => false
+    end
+  ) mapped with
+  | false => None
+  | true => Some (fold_right (
+      fun el acc => match el with
+      | Some e => e :: acc
+      | None => acc
+      end
+    ) [] mapped)
+  end.
+
 (** Συμπληρώστε τον παρακάτω interpreter. *)
 
-Fixpoint eval (fuel : nat) (env : environment) (t : term) : option value
-(* :=   ___ FILL IN HERE ___. *)
-. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+Fixpoint eval (fuel : nat) (env : environment) (t : term) : option value :=
+  match fuel with
+  | 0 => None
+  | S fuel' =>
+    match t with
+    (* Application *)
+    | <[ t1 t2 ]> =>
+      match eval fuel' env t1, eval fuel' env t2 with
+      | Some (V_Clo env' x t), Some v => eval fuel' (add x v env') t
+      | _, _ => None
+      end
+    (* Let *)
+    | <[ let x := t1 in t2 ]> =>
+      match eval fuel' env t1 with
+      | Some v => eval fuel' (add x v env) t2
+      | _ => None
+      end
+    (* If *)
+    | <[ if t1 then t2 else t3 ]> =>
+      match eval fuel' env t1 with
+      | Some (V_Bool true) => eval fuel' env t2
+      | Some (V_Bool false) => eval fuel' env t3
+      | _ => None
+      end
+    (* Bop *)
+    | T_BOp bop t1 t2 =>
+      match eval fuel' env t1, eval fuel' env t2 with
+      | Some (V_Bool b1), Some (V_Bool b2) =>
+        match bop with
+        | And => Some (V_Bool (b1 && b2))
+        | Or => Some (V_Bool (b1 || b2))
+        | _ => None
+        end
+      | Some (V_Nat n1), Some (V_Nat n2) =>
+        match bop with
+        | Plus =>   Some (V_Nat (n1 + n2))
+        | Minus =>  Some (V_Nat (n1 - n2))
+        | Mult =>   Some (V_Nat (n1 * n2))
+        | Lt =>     Some (V_Bool (n1 <? n2))
+        | Eq =>     Some (V_Bool (n1 =? n2))
+        | _ => None
+        end
+      | _, _ => None
+      end
+    (* Uop *)
+    | T_UOp op t =>
+      match eval fuel' env t, op with
+      | Some (V_Bool b), Neg => Some (V_Bool (negb b))
+      | _, _ => None
+      end
+    (* Tuple Projection *)
+    | <[t # n]> =>
+      match eval fuel' env t with
+      | Some (V_Tuple vl) => nth_error vl n
+      | _ => None
+      end
+    (* Tuple *)
+    | T_Tuple lst =>
+      match tuple_aux (eval fuel' env) lst with
+      | Some res => Some (V_Tuple res)
+      | None => None
+      end
+    (* Values *)
+    | <[ fun x -> t ]> => Some (V_Clo env x t)
+    | T_Nat n => Some (V_Nat n)
+    | T_Bool b => Some (V_Bool b)
+    | T_Var x => lookup x env
+    end
+  end.
 
 
 (** Top-level ορισμός για την αποτίμηση ενός προγράμματος στο κενό περιβάλλον. *)
@@ -178,25 +263,45 @@ Definition test4 : term := <[ let foo :=
 Definition myfact : term :=
   <[ letrec fact := fun n -> if n = 0 then 1 else n * fact (n - 1) in fact 5 ]>.
 
+Definition mytest1 : term := <[
+  let f := fun x ->
+    let x := x + 1 in
+    let y := 2 in
+    let foo := fun y ->
+      x + y in
+    let bar := fun n -> 
+      let fact := x + y + n in
+      fact in
+    foo (bar 10) in
+  f 0
+]>.
+
+Definition mytest2: term := <[
+  let f := fun x -> x 5 in
+  let foo := fun x -> x + 3 in
+  f foo
+]>.
+
 Example example1 : eval_top 1000 test1 = Some (V_Nat 8).
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 Example example2 : eval_top 1000 test2 = Some (V_Nat 15).
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 Example example3 : eval_top 1000 test3 = Some (V_Nat 16).
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 Example example4 : eval_top 1000 test4 = Some (V_Nat 15).
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
 
 Example example5 : eval_top 1000 myfact = Some (V_Nat 120).
-Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-(* Proof. reflexivity. Qed. *)
+Proof. reflexivity. Qed.
+
+Example example6 : eval_top 1000 mytest1 = Some (V_Nat 14).
+Proof. reflexivity. Qed.
+
+Example example7 : eval_top 1000 mytest2 = Some (V_Nat 8).
+Proof. reflexivity. Qed.
 
 
 (** ** Άσκηση 2: Closure conversion για miniML (50 μονάδες) *)
