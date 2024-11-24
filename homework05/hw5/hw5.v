@@ -150,21 +150,14 @@ Definition environment : Type := var_map value.
 
 (** Χρειαζόμαστε βοηθητική συνάρτηση *)
 
-Definition tuple_aux {A} {B} (f : A -> option B) (l : list A) :=
-  let mapped := map f l in
-  match existsb (
-    fun el => match el with
-    | Some _ => true
-    | None => false
+Fixpoint tuple_aux {A} {B} (f : A -> option B) (l : list A) :=
+  match l with 
+  | [] => Some []
+  | hd :: tl =>
+    match f hd, tuple_aux f tl with
+    | Some head, Some tail => Some (head :: tail)
+    | _, _ => None
     end
-  ) mapped with
-  | false => None
-  | true => Some (fold_right (
-      fun el acc => match el with
-      | Some e => e :: acc
-      | None => acc
-      end
-    ) [] mapped)
   end.
 
 (** Συμπληρώστε τον παρακάτω interpreter. *)
@@ -277,11 +270,11 @@ Definition mytest1 : term := <[
 ]>.
 
 Definition mytest2: term := <[
-  let bar := fun x -> fun y ->
-    let f := fun n -> n x in
-    let foo := fun n -> n + y in
+  let bar := fun x ->
+    let f := fun y -> y (x # 0) in
+    let foo := fun y -> y - (x # 1) in
     f foo in
-    bar 5 3
+    bar {5, 3}
 ]>.
 
 Example example1 : eval_top 1000 test1 = Some (V_Nat 8).
@@ -302,7 +295,7 @@ Proof. reflexivity. Qed.
 Example example6 : eval_top 1000 mytest1 = Some (V_Nat 14).
 Proof. reflexivity. Qed.
 
-Example example7 : eval_top 1000 mytest2 = Some (V_Nat 8).
+Example example7 : eval_top 1000 mytest2 = Some (V_Nat 2).
 Proof. reflexivity. Qed.
 
 
