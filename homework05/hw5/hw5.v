@@ -277,9 +277,11 @@ Definition mytest1 : term := <[
 ]>.
 
 Definition mytest2: term := <[
-  let f := fun x -> x 5 in
-  let foo := fun x -> x + 3 in
-  f foo
+  let bar := fun x -> fun y ->
+    let f := fun n -> n x in
+    let foo := fun n -> n + y in
+    f foo in
+    bar 5 3
 ]>.
 
 Example example1 : eval_top 1000 test1 = Some (V_Nat 8).
