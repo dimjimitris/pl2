@@ -411,32 +411,88 @@ Module ClosureConversion.
 
 
   (** Συμπληρώστε την παρακάτω συνάρτηση *)
-  
-  Fixpoint closure_conv (t : term) : term (* :=   ___ FILL IN HERE ___. *)
-  . Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+
+  Definition _arg : string := "_arg".
+  Definition _env : string := "_env".
+
+  Fixpoint fold_lefti_aux {A} {B} (n : nat) (f : nat -> A -> B -> A) (l : list B) (a0 : A) :=
+    match l with
+      | [] => a0
+      | b :: t => fold_lefti_aux (n + 1) f t (f n a0 b)
+    end.
+
+  Definition fold_lefti {A} {B} (f : nat -> A -> B -> A) (l : list B) (a0 : A) :=
+    fold_lefti_aux 0 f l a0.
+
+  (* antiquotation *)
+  Notation "{{ x }}" := x (in custom ML at level 1, x constr).
+
+  Fixpoint closure_conv (t : term) : term :=
+    match t with
+    (* Application *)
+    | <[t1 t2 ]> =>
+        let t1' := closure_conv t1 in
+        let t2' := closure_conv t2 in
+        let f_env := <[ t1' # 0 ]> in
+        let f_fun := <[ t1' # 1 ]> in
+        <[ f_fun { t2', f_env } ]>
+    (* Lambda function definition *)
+    | <[ fun x -> t ]> =>
+      let fvs := free_vars [x] t in
+      let fvs' := T_Tuple (map T_Var fvs) in
+      let cct := closure_conv t in
+      <[ {
+          fvs',
+          fun _arg ->
+            let x := _arg # 0 in
+            let _env := _arg # 1 in
+            {{  fold_lefti (
+                  fun idx t' fv =>
+                  <[ let fv := _env # idx in t' ]>
+                ) fvs cct  }}
+          } ]>
+    (* Let *)
+    | <[ let x := t1 in t2 ]> =>
+      <[ let x := {{ closure_conv t1 }} in {{ closure_conv t2 }} ]>
+    (* If *)
+    | <[ if t1 then t2 else t3 ]> => 
+      <[ if {{ closure_conv t1 }} then {{ closure_conv t2 }} else {{ closure_conv t3 }} ]>
+    (* Bop *)
+    | T_BOp bop t1 t2 => T_BOp bop (closure_conv t1) (closure_conv t2)
+    (* Uop *)
+    | T_UOp op t => T_UOp op (closure_conv t)
+    (* Tuple Projection *)
+    | <[ t # n ]> => <[ {{ closure_conv t }} # n ]>
+    (* Tuple *)
+    | T_Tuple lst => T_Tuple (map closure_conv lst)
+    (* Values *)
+    | T_Var s => T_Var s
+    | T_Nat n => T_Nat n
+    | T_Bool b => T_Bool b
+    end.
 
   (** Εάν ο ορισμός σας είναι σωστός τα παρακάτω tests θα πρέπει να επιτυγχάνουν. *)
 
   Example example1 : eval_top 1000 (closure_conv test1) = Some (V_Nat 8).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. simpl closure_conv. reflexivity. Qed.
 
   Example example2 : eval_top 1000 (closure_conv test2) = Some (V_Nat 15).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. reflexivity. Qed.
 
   Example example3 : eval_top 1000 (closure_conv test3) = Some (V_Nat 16).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. reflexivity. Qed.
 
   Example example4 : eval_top 1000 (closure_conv test4) = Some (V_Nat 15).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. reflexivity. Qed.
 
   Example example5 : eval_top 1000 (closure_conv myfact) = Some (V_Nat 120).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. reflexivity. Qed.
 
+  Example example6 : eval_top 1000 (closure_conv mytest1) = Some (V_Nat 14).
+  Proof. reflexivity. Qed.
+
+  Example example7 : eval_top 1000 (closure_conv mytest2) = Some (V_Nat 2).
+  Proof. reflexivity. Qed.
 
   (** Έχοντας υλοποιήσει τα closures μέσα στην ίδια τη γλώσσα, πλέον
       μπορούμε να γράψουμε έναν interpreter που δεν χρειάζεται
@@ -466,9 +522,75 @@ Module ClosureConversion.
 
   (** Προσαρμόστε τον ορισμό του παραπάνω interpreter ώστε να μην χρησιμοποιεί closures. *)
 
-  Fixpoint eval (fuel : nat) (env : environment) (t : term) : option value
-  (* :=   ___ FILL IN HERE ___. *)
-  . Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+  Fixpoint eval (fuel : nat) (env : environment) (t : term) : option value :=
+    match fuel with
+    | 0 => None
+    | S fuel' =>
+      match t with
+      (* Application *)
+      | <[ t1 t2 ]> =>
+        match eval fuel' env t1, eval fuel' env t2 with
+        | Some (V_Fun x t), Some v => eval fuel' (add x v env) t
+        | _, _ => None
+        end
+      (* Let *)
+      | <[ let x := t1 in t2 ]> =>
+        match eval fuel' env t1 with
+        | Some v => eval fuel' (add x v env) t2
+        | _ => None
+        end
+      (* If *)
+      | <[ if t1 then t2 else t3 ]> =>
+        match eval fuel' env t1 with
+        | Some (V_Bool true) => eval fuel' env t2
+        | Some (V_Bool false) => eval fuel' env t3
+        | _ => None
+        end
+      (* Bop *)
+      | T_BOp bop t1 t2 =>
+        match eval fuel' env t1, eval fuel' env t2 with
+        | Some (V_Bool b1), Some (V_Bool b2) =>
+          match bop with
+          | And => Some (V_Bool (b1 && b2))
+          | Or => Some (V_Bool (b1 || b2))
+          | _ => None
+          end
+        | Some (V_Nat n1), Some (V_Nat n2) =>
+          match bop with
+          | Plus =>   Some (V_Nat (n1 + n2))
+          | Minus =>  Some (V_Nat (n1 - n2))
+          | Mult =>   Some (V_Nat (n1 * n2))
+          | Lt =>     Some (V_Bool (n1 <? n2))
+          | Eq =>     Some (V_Bool (n1 =? n2))
+          | _ => None
+          end
+        | _, _ => None
+        end
+      (* Uop *)
+      | T_UOp op t =>
+        match eval fuel' env t, op with
+        | Some (V_Bool b), Neg => Some (V_Bool (negb b))
+        | _, _ => None
+        end
+      (* Tuple Projection *)
+      | <[t # n]> =>
+        match eval fuel' env t with
+        | Some (V_Tuple vl) => nth_error vl n
+        | _ => None
+        end
+      (* Tuple *)
+      | T_Tuple lst =>
+        match tuple_aux (eval fuel' env) lst with
+        | Some res => Some (V_Tuple res)
+        | None => None
+        end
+      (* Values *)
+      | <[ fun x -> t ]> => Some (V_Fun x t)
+      | T_Nat n => Some (V_Nat n)
+      | T_Bool b => Some (V_Bool b)
+      | T_Var x => lookup x env
+      end
+    end.
 
 
   Definition eval_top (fuel : nat) (t : term) : option value :=
@@ -477,24 +599,25 @@ Module ClosureConversion.
   (** Εάν ο ορισμός σας είναι σωστός τα παρακάτω tests θα πρέπει να επιτυγχάνουν. *)
 
   Example example1' : eval_top 1000 (closure_conv test1) = Some (V_Nat 8).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. reflexivity. Qed.
 
   Example example2' : eval_top 1000 (closure_conv test2) = Some (V_Nat 15).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. reflexivity. Qed.
 
   Example example3' : eval_top 1000 (closure_conv test3) = Some (V_Nat 16).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. reflexivity. Qed.
 
   Example example4' : eval_top 1000 (closure_conv test4) = Some (V_Nat 15).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. reflexivity. Qed.
 
   Example example5' : eval_top 1000 (closure_conv myfact) = Some (V_Nat 120).
-  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
-  (* Proof. reflexivity. Qed. *)
+  Proof. reflexivity. Qed.
+
+  Example example6' : eval_top 1000 (closure_conv mytest1) = Some (V_Nat 14).
+  Proof. reflexivity. Qed.
+
+  Example example7' : eval_top 1000 (closure_conv mytest2) = Some (V_Nat 2).
+  Proof. reflexivity. Qed.
 
   (** Μετά από το στάδιο του closure conversion, όλες οι συναρτήσεις
       στο πρόγραμμα μπορούν να μεταφερθούν στην αρχή του προγράμματος,
