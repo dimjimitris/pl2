@@ -241,6 +241,7 @@ Definition eval_top (fuel : nat) (t : term) : option value :=
 (** Εάν ο ορισμός σας είναι σωστός τα παρακάτω tests θα πρέπει να επιτυγχάνουν. *)
 
 Definition test1 : term := <[ let f := (fun x -> x + 4) in f 4 ]> .
+
 Definition test2 : term := <[ let foo := (fun x -> x + 7) in
                               let bar := (fun x -> x * 2) in
                               (foo (bar 4)) ]>.
@@ -277,6 +278,39 @@ Definition mytest2: term := <[
     bar {5, 3}
 ]>.
 
+Definition mytest3: term := <[
+  let f := fun x ->
+    let foo := fun y -> fun x -> x + y in
+    foo x x in
+  f 2
+]>.
+
+Definition mytest4: term := <[ (fun f -> f 4) (fun x -> x + 4) ]>.
+
+Definition k : string := "k".
+
+Definition mytest5: term := <[
+  let y := 1 in
+  let f := fun x -> y + x in
+  let foo := fun n -> fun k -> n + k in
+  let bar := foo (f 0) in
+  let y := y + 1 in
+  bar (f 1)
+]>.
+
+Definition mytest6: term := <[ let f := 1 in f 2 ]>.
+
+Definition mytest7: term := <[ (fun x -> x + 1) 1 ]>.
+
+Definition mytest8: term := <[
+  let f := fun x -> fun y -> 
+  let foo := fun n -> { fun x -> x * y , fun x -> y + x } in
+  let foo := foo 0 in
+  (foo # 0) x + (foo # 1) x in
+  f 1 1
+]>.
+
+
 Example example1 : eval_top 1000 test1 = Some (V_Nat 8).
 Proof. reflexivity. Qed.
 
@@ -298,6 +332,23 @@ Proof. reflexivity. Qed.
 Example example7 : eval_top 1000 mytest2 = Some (V_Nat 2).
 Proof. reflexivity. Qed.
 
+Example example8 : eval_top 1000 mytest3 = Some (V_Nat 4).
+Proof.  reflexivity. Qed.
+
+Example example9 : eval_top 1000 mytest4 = Some (V_Nat 8).
+Proof.  reflexivity. Qed.
+
+Example example10 : eval_top 1000 mytest5 = Some (V_Nat 3).
+Proof.  reflexivity. Qed.
+
+Example example11 : eval_top 1000 mytest6 = None.
+Proof.  reflexivity. Qed.
+
+Example example12 : eval_top 1000 mytest7 = Some (V_Nat 2).
+Proof.  reflexivity. Qed.
+
+Example example13 : eval_top 1000 mytest8 = Some (V_Nat 3).
+Proof.  reflexivity. Qed.
 
 (** ** Άσκηση 2: Closure conversion για miniML (50 μονάδες) *)
 
@@ -425,7 +476,7 @@ Module ClosureConversion.
     fold_lefti_aux 0 f l a0.
 
   (* antiquotation *)
-  Notation "{{ x }}" := x (in custom ML at level 1, x constr).
+  Notation "<{ x }>" := x (in custom ML at level 1, x constr).
 
   Fixpoint closure_conv (t : term) : term :=
     match t with
@@ -441,28 +492,42 @@ Module ClosureConversion.
       let fvs := free_vars [x] t in
       let fvs' := T_Tuple (map T_Var fvs) in
       let cct := closure_conv t in
-      <[ {
+      <[{
           fvs',
           fun _arg ->
             let x := _arg # 0 in
             let _env := _arg # 1 in
-            {{  fold_lefti (
+            <{  fold_lefti (
                   fun idx t' fv =>
                   <[ let fv := _env # idx in t' ]>
-                ) fvs cct  }}
-          } ]>
+                ) fvs cct  }>
+        }]>
     (* Let *)
     | <[ let x := t1 in t2 ]> =>
-      <[ let x := {{ closure_conv t1 }} in {{ closure_conv t2 }} ]>
+      (*
+      let fvs := free_vars [x] t2 in
+      let fvs' := T_Tuple (map T_Var fvs) in
+      let t2' := closure_conv t2 in
+      <[  (fun _arg ->
+            let x := _arg # 0 in
+            let _env := _arg # 1 in
+            <{  fold_lefti (
+                  fun idx t' fv =>
+                  <[ let fv := _env # idx in t' ]>
+                ) fvs t2'  }>)
+        { <{ closure_conv t1 }>, fvs' } ]> *)
+      (** Αφού το <[ let x := t1 in t2 ]> ισοδυναμεί με <[ (fun x -> t2) t1 ]>
+       *  μπορούμε να το μοντελοποιήσουμε όπως παραπάνω *)
+      <[ let x := <{ closure_conv t1 }> in <{ closure_conv t2 }> ]>
     (* If *)
     | <[ if t1 then t2 else t3 ]> => 
-      <[ if {{ closure_conv t1 }} then {{ closure_conv t2 }} else {{ closure_conv t3 }} ]>
+      <[ if <{ closure_conv t1 }> then <{ closure_conv t2 }> else <{ closure_conv t3 }> ]>
     (* Bop *)
     | T_BOp bop t1 t2 => T_BOp bop (closure_conv t1) (closure_conv t2)
     (* Uop *)
     | T_UOp op t => T_UOp op (closure_conv t)
     (* Tuple Projection *)
-    | <[ t # n ]> => <[ {{ closure_conv t }} # n ]>
+    | <[ t # n ]> => <[ <{ closure_conv t }> # n ]>
     (* Tuple *)
     | T_Tuple lst => T_Tuple (map closure_conv lst)
     (* Values *)
@@ -474,7 +539,7 @@ Module ClosureConversion.
   (** Εάν ο ορισμός σας είναι σωστός τα παρακάτω tests θα πρέπει να επιτυγχάνουν. *)
 
   Example example1 : eval_top 1000 (closure_conv test1) = Some (V_Nat 8).
-  Proof. simpl closure_conv. reflexivity. Qed.
+  Proof. reflexivity. Qed.
 
   Example example2 : eval_top 1000 (closure_conv test2) = Some (V_Nat 15).
   Proof. reflexivity. Qed.
@@ -493,6 +558,24 @@ Module ClosureConversion.
 
   Example example7 : eval_top 1000 (closure_conv mytest2) = Some (V_Nat 2).
   Proof. reflexivity. Qed.
+
+  Example example8 : eval_top 1000 (closure_conv mytest3) = Some (V_Nat 4).
+  Proof.  reflexivity. Qed.
+
+  Example example9 : eval_top 1000 (closure_conv mytest4) = Some (V_Nat 8).
+  Proof.  reflexivity. Qed.
+
+  Example example10 : eval_top 1000 (closure_conv mytest5) = Some (V_Nat 3).
+  Proof.  reflexivity. Qed.
+
+  Example example11 : eval_top 1000 (closure_conv mytest6) = None.
+  Proof.  reflexivity. Qed.
+
+  Example example12 : eval_top 1000 (closure_conv mytest7) = Some (V_Nat 2).
+  Proof. unfold mytest7. unfold closure_conv. simpl. reflexivity. Qed.
+
+  Example example13 : eval_top 1000 (closure_conv mytest8) = Some (V_Nat 3).
+  Proof.  reflexivity. Qed.
 
   (** Έχοντας υλοποιήσει τα closures μέσα στην ίδια τη γλώσσα, πλέον
       μπορούμε να γράψουμε έναν interpreter που δεν χρειάζεται
@@ -618,6 +701,24 @@ Module ClosureConversion.
 
   Example example7' : eval_top 1000 (closure_conv mytest2) = Some (V_Nat 2).
   Proof. reflexivity. Qed.
+
+  Example example8' : eval_top 1000 (closure_conv mytest3) = Some (V_Nat 4).
+  Proof.  reflexivity. Qed.
+
+  Example example9' : eval_top 1000 (closure_conv mytest4) = Some (V_Nat 8).
+  Proof.  reflexivity. Qed.
+
+  Example example10' : eval_top 1000 (closure_conv mytest5) = Some (V_Nat 3).
+  Proof.  reflexivity. Qed.
+
+  Example example11' : eval_top 1000 (closure_conv mytest6) = None.
+  Proof.  reflexivity. Qed.
+
+  Example example12' : eval_top 1000 (closure_conv mytest7) = Some (V_Nat 2).
+  Proof.  reflexivity. Qed.
+
+  Example example13' : eval_top 1000 (closure_conv mytest8) = Some (V_Nat 3).
+  Proof.  reflexivity. Qed.
 
   (** Μετά από το στάδιο του closure conversion, όλες οι συναρτήσεις
       στο πρόγραμμα μπορούν να μεταφερθούν στην αρχή του προγράμματος,
