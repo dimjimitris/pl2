@@ -1392,10 +1392,10 @@ Fixpoint eval (fuel : nat) (t : term) : option term :=
           | _ => None
           end
       (* Pair *)
-      | T_Pair t1 t2 =>
+      | (t1, t2) =>
           v1 <- eval fuel' t1 ;;
           v2 <- eval fuel' t2 ;;
-          return <[ v1 v2 ]>
+          return <[ (v1, v2) ]>
       (* Left injection *)
       | <[ inl T t ]>  =>
           v <- eval fuel' t ;;
@@ -1403,12 +1403,12 @@ Fixpoint eval (fuel : nat) (t : term) : option term :=
       (* Right injection *)
       | <[ inr T t ]>  =>
           v <- eval fuel' t ;;
-          return <[ inr T t ]>
+          return <[ inr T v ]>
       (* Case *)
       | <[ case t of | inl y1 => t1 | inr y2 => t2 ]> =>
           v <- eval fuel' t ;;
           match v with
-          | <[ int T v1 ]>  => eval fuel' <[ [y1 := v1] t1 ]> 
+          | <[ inl T v1 ]>  => eval fuel' <[ [y1 := v1] t1 ]> 
           | <[ inr T v2 ]> => eval fuel' <[ [y2 := v2] t1 ]>
           | _ => fail
           end
