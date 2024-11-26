@@ -2,8 +2,8 @@ Require Import Coq.Strings.String Coq.Init.Nat Lia Coq.Lists.List.
 Import List Notations.
 
 (** Στοιχεία Σπουδαστή
-Όνομα:
-ΑΜ:
+Όνομα: ΔΗΜΗΤΡΙΟΣ ΓΕΩΡΓΟΥΣΗΣ
+ΑΜ: 03119005
 *)
 
 (** * Εργασία 6: General Recursion (100 μονάδες + 20 μονάδες bonus **)
