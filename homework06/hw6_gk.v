@@ -2,11 +2,11 @@ Require Import Coq.Strings.String Coq.Init.Nat Lia Coq.Lists.List.
 Import List Notations.
 
 (** Στοιχεία Σπουδαστή
-Όνομα: ΔΗΜΗΤΡΙΟΣ ΓΕΩΡΓΟΥΣΗΣ
-ΑΜ: 03119005
+Όνομα: Γεώργιος Καπετανάκης
+ΑΜ: 03119062
 *)
 
-(** * Εργασία 6: General Recursion (100 μονάδες + 20 μονάδες bonus **)
+(** * Εργασία 6: General Recursion (100 μονάδες + 20 μονάδες bonus) **)
 
 (** Ο σκοπός αυτής της εργασίας είναι να εξοικειωθείτε με τη στατική
     και δυναμική σημασιολογία του Λ λογισμού και των σχετικών
@@ -113,7 +113,7 @@ Inductive term : Type :=
 | T_Inr : type -> term -> term
 | T_Case : term -> string -> term -> string -> term -> term
 (* Ο τελεστής Fix. Νέος όρος!!! *)
-| T_Fix  : term -> term.
+| T_Fix : term -> term.
 
 (** Concrete Syntax *)
 
@@ -343,7 +343,7 @@ Inductive step : term -> term -> Prop :=
 (* pure STLC *)
 | Step_AppAbs : forall x T2 t1 v2,
     value v2 ->
-    <[ (fun x:T2 -> t1) v2 ]> --> <[ [x:=v2]t1 ]>
+    <[ (fun x : T2 -> t1) v2 ]> --> <[ [x := v2]t1 ]>
 | Step_App1 : forall t1 t1' t2,
     t1 --> t1' ->
     <[ t1 t2 ]> --> <[ t1' t2 ]>
@@ -425,26 +425,35 @@ Inductive step : term -> term -> Prop :=
     <[ case t' of | inl x1 => t1 | inr x2 => t2 ]>
 | Step_CaseInl : forall v x1 t1 x2 t2 T2,
     value v ->
-    <[ case inl T2 v of | inl x1 => t1 | inr x2 => t2 ]> --> <[ [x1:=v]t1 ]>
+    <[ case inl T2 v of
+       | inl x1 => t1
+       | inr x2 => t2 ]> --> <[ [x1:=v]t1 ]>
 | Step_CaseInr : forall v x1 t1 x2 t2 T1,
     value v ->
-    <[ case inr T1 v of | inl x1 => t1 | inr x2 => t2 ]> --> <[ [x2:=v]t2 ]>
-| Step_FixAbs : forall f t x A,
-  f = <[ fun x : A -> t ]> ->
-  <[ fix f ]> -->
-  <[ [x := fix f] t ]>
+    <[ case inr T1 v of
+       | inl x1 => t1
+       | inr x2 => t2 ]> --> <[ [x2:=v]t2 ]>
+(* Fix *)
+(*
+  fact' f n -> if n = 0 then 1 else n * f (n-1)
+  fact = fix fact'
+*)
+(*
+  let fact :=
+    let fact' :=
+      fun f ->
+        fun n ->
+          if n = 0 then 1 else n * f (n-1)
+    in
+    fix fact'.
+*)
+| Step_FixAbs : forall t v,
+    value v ->
+    <[ fix v ]>
 | Step_Fix : forall t t',
     t --> t' ->
     <[ fix t ]> --> <[ fix t' ]>
-(*
-  let fact :=
-    let fact' := (
-      fun f ->
-        fun n ->
-          if n = 0 then 1 else n * f (n - 1)
-    ) in
-    fix fact'.
-*)
+| 
 
 (* [step] grade 0/20 *)
       
@@ -544,10 +553,10 @@ Inductive has_type : context -> term -> type -> Prop :=
       (x2 |-> B ; Gamma) ⊢ t2 : C ->
       Gamma ⊢ (case t of | inl x1 => t1 | inr x2 => t2) : C
   (* Fix *)
-  | Ty_Fix : forall Gamma t A,
-      Gamma ⊢ t : (A -> A) ->
-      Gamma ⊢ (fix t) : A
-      
+  | Ty_Fix : forall Gamma t A B,
+      Gamma ⊢ t : (A -> B) ->
+      Gamma ⊢ (fix t) : B
+
 where "Gamma '⊢' t ':' T" := (has_type Gamma t T).
 
 
@@ -591,7 +600,7 @@ Lemma canonical_forms_fun :
   forall t T1 T2,
     empty ⊢ t : (T1 -> T2) ->
     value t ->
-    exists x u, t = <[ fun x : T1  -> u ]>.
+    exists x u, t = <[ fun x : T1 -> u ]>.
 Proof.
   intros t T1 T2 Htyp Hval.
   inv Hval; inv Htyp. eauto.
@@ -637,7 +646,7 @@ Proof. intros []; simpl; try discriminate; eauto. Qed.
 (** Note: Proof of certain cases and comments are taken from "Software
     Foundations"*)
 
-(** Theorem: Suppose empty ⊢- t \in A.  Then either
+(** Theorem: Suppose empty ⊢ t \in A.  Then either
       1. t is a value, or
       2. t --> t' for some t'.
 
@@ -782,8 +791,9 @@ Proof.
       eauto; subst; eauto.
 
     (* Ty_fix *)
-  - destruct IHHt as [ | [t' Hstp]]; eauto.
-    edestruct (canonical_forms_fun t) as [x [u Hstp]]; eauto.
+  - destruct IHHt as [ | [t' Hstp]].
+    + reflexivity.
+    + left. unfold value.
 Qed.
 
 (* [progress] grade 0/10*)
@@ -1029,11 +1039,10 @@ Proof.
     + inv Htyp1. 
       eapply substitution_preserves_typing; eauto.
 
-  - (* Ty_fix *)
-    inv Hstep; eauto.
-    eapply substitution_preserves_typing; eauto.
-    inv Htyp; eauto.
-Qed.
+    (* Ty_fix *)
+    (* ___ FILL IN HERE ___ *)
+Admitted. 
+
 
 (* [preservation] grade 0/10*)
 
@@ -1154,13 +1163,8 @@ Fixpoint type_check (Gamma : context) (t : term) : option type :=
       | _ => fail
       end
   (* Fix *)
-  | <[ fix t ]> => 
-      A <- type_check Gamma t ;;
-      match A with
-      | <[[ A1 -> A2 ]]> =>
-          if ty_eqb A1 A2 then return A1 else fail
-      | _ => fail
-      end
+  | <[ fix t ]> => fail (* ___ FILL IN HERE ___ *)
+
   end.
 
 (* [type_check] grade 0/10*)
@@ -1230,7 +1234,7 @@ Proof.
   
   - destruct bop0; simpl in *; try congruence.
   - destruct bop0; simpl in *; try congruence.
-  - destruct bop0; simpl in *; try congruence.
+  - destruct bop0; simpl in *; try congruence.    
 Qed.
 
 
@@ -1250,11 +1254,9 @@ Qed.
     Hint: Δείτε το notation που έχουμε ορίσει για το let-rec στην
     untyped miniML. *)
 
-Definition letrec (f : string) (fA : type) (ft : term) (rest : term) : term :=
-(* let rec f : fA := ft in rest *)
-  <[
-    let f := fix ( fun f : fA -> ft ) in rest
-  ]>.
+Definition letrec (f : string) (fA : type) (ft : term) (rest : term) : term
+(* :=   ___ FILL IN HERE ___. *)
+. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
 
 
 (* [letrec] grade 0/10 *)
@@ -1282,25 +1284,9 @@ Notation "'let' 'rec' f ':' T ':=' y 'in' z" :=
 
 Definition letrecand (f : string) (fA : type) (ft : term)
                      (g : string) (gA : type) (gt : term)
-                     (rest : term) : term :=
-(*
-  let mut f : fA := ft and g : gA := gt in rest
-*)
-<[
-  let g := fix (
-    (
-      fun g : <[[ fA * gA ]]> -> 
-        let g := g.2 in ft
-    ),
-    (
-      fun f : <[[ fA * gA ]]> ->
-        let f := f.1 in gt
-    )
-  ).1 in
-  let f := g.1 in
-  let g := g.2 in
-  rest
-]>.
+                     (rest : term) : term
+(* :=   ___ FILL IN HERE ___. *)
+. Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
 
 
 (* [letrecand] grade 0/20 *)
