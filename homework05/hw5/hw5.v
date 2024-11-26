@@ -465,6 +465,7 @@ Module ClosureConversion.
 
   Definition _arg : string := "_arg".
   Definition _env : string := "_env".
+  Definition _fun : string := "_fun".
 
   Fixpoint fold_lefti_aux {A} {B} (n : nat) (f : nat -> A -> B -> A) (l : list B) (a0 : A) :=
     match l with
@@ -481,26 +482,23 @@ Module ClosureConversion.
   Fixpoint closure_conv (t : term) : term :=
     match t with
     (* Application *)
-    | <[t1 t2 ]> =>
-        let t1' := closure_conv t1 in
-        let t2' := closure_conv t2 in
-        let f_env := <[ t1' # 0 ]> in
-        let f_fun := <[ t1' # 1 ]> in
-        <[ f_fun { t2', f_env } ]>
+    | <[t1 t2 ]> => 
+      <[
+        let _fun := <{ closure_conv t1 }> in
+        (_fun # 1) { <{ closure_conv t2 }> , (_fun # 0) }
+      ]>
     (* Lambda function definition *)
     | <[ fun x -> t ]> =>
       let fvs := free_vars [x] t in
-      let fvs' := T_Tuple (map T_Var fvs) in
-      let cct := closure_conv t in
       <[{
-          fvs',
+          <{ T_Tuple (map T_Var fvs) }>,
           fun _arg ->
             let x := _arg # 0 in
             let _env := _arg # 1 in
             <{  fold_lefti (
                   fun idx t' fv =>
                   <[ let fv := _env # idx in t' ]>
-                ) fvs cct  }>
+                ) fvs (closure_conv t)  }>
         }]>
     (* Let *)
     | <[ let x := t1 in t2 ]> =>
