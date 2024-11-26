@@ -487,6 +487,9 @@ Module ClosureConversion.
         let _fun := <{ closure_conv t1 }> in
         (_fun # 1) { <{ closure_conv t2 }> , (_fun # 0) }
       ]>
+      (** Ορίζουμε την μεταβλητή/τιμή '_fun' για να γίνει το
+       * closure_conv t1 μόνο μία φορά, αυτό είναι και το 
+       * optimization που χρειαζόμασταν σε αυτό το ερώτημα *)
     (* Lambda function definition *)
     | <[ fun x -> t ]> =>
       let fvs := free_vars [x] t in
@@ -558,22 +561,22 @@ Module ClosureConversion.
   Proof. reflexivity. Qed.
 
   Example example8 : eval_top 1000 (closure_conv mytest3) = Some (V_Nat 4).
-  Proof.  reflexivity. Qed.
+  Proof. reflexivity. Qed.
 
   Example example9 : eval_top 1000 (closure_conv mytest4) = Some (V_Nat 8).
-  Proof.  reflexivity. Qed.
+  Proof. reflexivity. Qed.
 
   Example example10 : eval_top 1000 (closure_conv mytest5) = Some (V_Nat 3).
-  Proof.  reflexivity. Qed.
+  Proof. reflexivity. Qed.
 
   Example example11 : eval_top 1000 (closure_conv mytest6) = None.
-  Proof.  reflexivity. Qed.
+  Proof. reflexivity. Qed.
 
   Example example12 : eval_top 1000 (closure_conv mytest7) = Some (V_Nat 2).
-  Proof. unfold mytest7. unfold closure_conv. simpl. reflexivity. Qed.
+  Proof. reflexivity. Qed.
 
   Example example13 : eval_top 1000 (closure_conv mytest8) = Some (V_Nat 3).
-  Proof.  reflexivity. Qed.
+  Proof. reflexivity. Qed.
 
   (** Έχοντας υλοποιήσει τα closures μέσα στην ίδια τη γλώσσα, πλέον
       μπορούμε να γράψουμε έναν interpreter που δεν χρειάζεται
