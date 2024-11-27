@@ -614,7 +614,7 @@ Module ClosureConversion.
       (* Application *)
       | <[ t1 t2 ]> =>
         match eval fuel' env t1, eval fuel' env t2 with
-        | Some (V_Fun x t), Some v => eval fuel' (add x v env) t
+        | Some (V_Fun x t), Some v => eval fuel' (add x v empty) t
         | _, _ => None
         end
       (* Let *)
