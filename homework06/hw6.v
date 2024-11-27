@@ -1244,7 +1244,7 @@ Qed.
     untyped miniML. *)
 
 Definition letrec (f : string) (fA : type) (ft : term) (rest : term) : term :=
-  <[ let f := fix (fun f : fA -> ft) in rest ]>.
+  <[ let f := (fix (fun f : fA -> ft)) in rest ]>.
 
 (* [letrec] grade 0/10 *)
 
@@ -1270,28 +1270,33 @@ Notation "'let' 'rec' f ':' T ':=' y 'in' z" :=
 
 Definition _x : string := "_x".
 Definition _y : string := "_y".
+Definition _selector : string := "_selector".
 
 Definition letrecand (f : string) (fA : type) (ft : term)
                      (g : string) (gA : type) (gt : term)
                      (rest : term) : term :=
 <[
-  let rec g : <[[ fA * gA ]]> := (
-    [f := g.1][g := g.2] (ft, gt)
-  ) in
+  let rec g : <[[ fA * gA ]]> := [f := g.1][g := g.2] (ft, gt) in
   let f := g.1 in
   let g := g.2 in
   rest
 ]>.
 (*<[
-  let f := (
-    fun g : <[[ fA * gA ]]> -> (
-        ([f := g.1][g := g.2] ft),
-        ([f := g.1][g := g.2] gt)
-    )
+  let _y := fix (
+    fun _x : fA ->
+      fun _selector : Bool ->
+        if _selector then (
+          [f := _x true]
+          [g := _x false]
+          ft
+        ) else (
+          [f := _x true]
+          [g := _x false]
+          gt
+        )
   ) in
-  let g := fix f in
-  let f := g.1 in
-  let g := g.2 in
+  let f := _y true in
+  let g := _y false in
   rest
 ]>.*)
 
@@ -1465,7 +1470,7 @@ Example example1 : eval 100 myfact = Some (T_Nat 120).
 Proof. compute. reflexivity. Qed.
 
 Example example3 : eval 100 ie_io = Some (T_Bool true).
-Proof. reflexivity. Qed.
+Proof. compute. reflexivity. Qed.
 
 Example example2 : eval 100 even_odd = Some (T_Bool true).
 Proof. compute. reflexivity. Qed.
