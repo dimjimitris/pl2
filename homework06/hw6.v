@@ -429,10 +429,9 @@ Inductive step : term -> term -> Prop :=
 | Step_CaseInr : forall v x1 t1 x2 t2 T1,
     value v ->
     <[ case inr T1 v of | inl x1 => t1 | inr x2 => t2 ]> --> <[ [x2:=v]t2 ]>
-| Step_FixAbs : forall f t x A,
-  f = <[ fun x : A -> t ]> ->
-  <[ fix f ]> -->
-  <[ [x := fix f] t ]>
+(* Fix *)
+| Step_FixAbs : forall t x A,
+    <[ fix (fun x : A -> t) ]> --> <[ [x := fix (fun x : A -> t)] t ]>
 | Step_Fix : forall t t',
     t --> t' ->
     <[ fix t ]> --> <[ fix t' ]>
@@ -772,10 +771,12 @@ Proof.
     edestruct (canonical_forms_sum t) as [ [v1 [Hstp1 Hv1]] | [v2 [Hstp2 Hv2]]];
       eauto; subst; eauto.
 
-    (* Ty_fix *)
-  - destruct IHHt as [ | [t' Hstp]]; eauto.
-    edestruct (canonical_forms_fun t) as [x [u Hstp]]; eauto.
-Qed.
+  - (* Ty_fix *)
+    destruct IHHt as [ | [t' Hstp]]; eauto.
+    edestruct (canonical_forms_fun t) as [x [u Hstp]];
+    [ | | try rewrite Hstp]; eauto.
+Qed.  
+
 
 (* [progress] grade 0/10*)
 
@@ -1026,6 +1027,7 @@ Proof.
     inv Htyp; eauto.
 Qed.
 
+
 (* [preservation] grade 0/10*)
 
 (** ** Type Checking *)
@@ -1146,12 +1148,12 @@ Fixpoint type_check (Gamma : context) (t : term) : option type :=
       end
   (* Fix *)
   | <[ fix t ]> => 
-      A <- type_check Gamma t ;;
-      match A with
-      | <[[ A1 -> A2 ]]> =>
-          if ty_eqb A1 A2 then return A1 else fail
-      | _ => fail
-      end
+    A <- type_check Gamma t ;;
+    match A with 
+    | <[[ A1 -> A2 ]]> =>
+        if ty_eqb A1 A2 then return A1 else fail
+    | _ => fail
+    end
   end.
 
 (* [type_check] grade 0/10*)
@@ -1221,7 +1223,7 @@ Proof.
   
   - destruct bop0; simpl in *; try congruence.
   - destruct bop0; simpl in *; try congruence.
-  - destruct bop0; simpl in *; try congruence.
+  - destruct bop0; simpl in *; try congruence.    
 Qed.
 
 
@@ -1242,11 +1244,7 @@ Qed.
     untyped miniML. *)
 
 Definition letrec (f : string) (fA : type) (ft : term) (rest : term) : term :=
-(* let rec f : fA := ft in rest *)
-  <[
-    let f := fix ( fun f : fA -> ft ) in rest
-  ]>.
-
+  <[ let f := fix (fun f : fA -> ft) in rest ]>.
 
 (* [letrec] grade 0/10 *)
 
@@ -1270,23 +1268,32 @@ Notation "'let' 'rec' f ':' T ':=' y 'in' z" :=
     να επιτρέπει τον ορισμό οποιουδήποτε αριθμού αμοιβαία αναδρομικών
     συναρτήσεων. *)
 
+Definition _x : string := "_x".
+Definition _y : string := "_y".
 
 Definition letrecand (f : string) (fA : type) (ft : term)
                      (g : string) (gA : type) (gt : term)
                      (rest : term) : term :=
-(*
-  let mut f : fA := ft and g : gA := gt in rest
-*)
 <[
-  let g := fix (
-    fun g : <[[ fA * gA ]]> -> 
-    (
-      [f := g.1 ][ g := g.2 ] ft,
-      [f := g.1 ][ g := g.2 ] gt
+  let rec g : <[[ fA * gA ]]> := (
+    [f := g.1][g := g.2] (ft, gt)
+  ) in
+  let f := g.1 in
+  let g := g.2 in
+  rest
+]>.
+(*<[
+  let f := (
+    fun g : <[[ fA * gA ]]> -> (
+        ([f := g.1][g := g.2] ft),
+        ([f := g.1][g := g.2] gt)
     )
   ) in
-  let f := g.1 in let g := g.2 in rest
-]>.
+  let g := fix f in
+  let f := g.1 in
+  let g := g.2 in
+  rest
+]>.*)
 
 (* [letrecand] grade 0/20 *)
 
@@ -1306,7 +1313,7 @@ Notation "'let' 'mut' f ':' Tf ':=' tf  'and' g ':' Tg ':=' tg 'in' z" :=
 
 Fixpoint eval (fuel : nat) (t : term) : option term :=
   match fuel with
-  | 0 => Some t
+  | 0 => None
   | S fuel' =>
       match t with
       (* Application *)
@@ -1399,13 +1406,13 @@ Fixpoint eval (fuel : nat) (t : term) : option term :=
           end
       (* Fix *)
       | <[ fix t ]> =>
-          v <- eval fuel' t ;;
-          match v with
-          | <[ fun x : T -> t']> =>
-              eval fuel' <[ [x := fix t ] t' ]>
-          | _ => fail
-          end
-      (* Values*)
+        v <- eval fuel' t ;;
+        match v with
+        | <[ fun x : T -> t' ]> =>
+            eval fuel' <[ [x := fix (fun x : T -> t')] t' ]>
+        | _ => fail
+        end
+      (* Values *)
       | <[ fun x : T -> t ]> => return  <[ fun x : T -> t ]>
       | T_Nat n => return (T_Nat n)
       | T_Bool b => return (T_Bool b)
@@ -1424,19 +1431,22 @@ Definition odd : string := "odd".
 Definition ieio : string := "ieio".
 
 Definition myfact : term :=
-  <[ let rec fact : Nat -> Nat :=
-       fun n : Nat -> if n = 0 then 1 else n * fact (n - 1)
-     in fact 5 ]>.
+  <[  let rec fact : Nat -> Nat :=
+      fun n : Nat -> if n = 0 then 1 else n * fact (n - 1)
+      in fact 5 ]>.
 
 Definition even_odd : term :=
-  <[ let mut even : Nat -> Nat := fun n : Nat -> if n = 0 then true else odd (n-1)
-     and odd : Nat -> Nat := fun n : Nat -> if n = 0 then false else even (n-1) in
-     even 42 ]>.
+  <[  
+    let mut
+      even : Nat -> Nat :=
+        fun n : Nat -> if n = 0 then true else odd (n-1)
+    and
+      odd : Nat -> Nat :=
+        fun n : Nat -> if n = 0 then false else even (n-1)
+    in
+      even 42
+  ]>.
 
-(** Εάν οι ορισμοί σας είναι σωστοί τα παρακάτω tests θα πρέπει να
-    επιτυγχάνουν. *)
-
-(** Το παρακάτω πρόγραμμα λειτουργεί κανονικά... *)
 Definition ie_io : term :=
   <[
     (fix (
@@ -1448,14 +1458,17 @@ Definition ie_io : term :=
     )).1 42
   ]>.
 
+(** Εάν οι ορισμοί σας είναι σωστοί τα παρακάτω tests θα πρέπει να
+    επιτυγχάνουν. *)
+
 Example example1 : eval 100 myfact = Some (T_Nat 120).
-Proof. reflexivity. Qed.
+Proof. compute. reflexivity. Qed.
 
 Example example3 : eval 100 ie_io = Some (T_Bool true).
 Proof. reflexivity. Qed.
 
 Example example2 : eval 100 even_odd = Some (T_Bool true).
-Proof. reflexivity. Qed.
+Proof. compute. reflexivity. Qed.
 
 
 (** Bonus ερώτημα: ορίστε έναν environment-based interpreter, παρόμοιο
@@ -1504,119 +1517,9 @@ Module EnvInterp.
 
   Definition environment : Type := var_map value.
 
-  Fixpoint eval (fuel : nat) (env : environment) (t : term) : option value :=
-    match fuel with
-    | 0 => fail
-    | S fuel' =>
-      match t with
-      (* Application *)
-      | <[ t1 t2 ]> =>
-        v1 <- eval fuel' env t1 ;;
-        match v1 with
-        | V_Clo env' x _ t =>
-          v2 <- eval fuel' env t2 ;;
-          eval fuel' (add x v2 env') t
-        | V_Fix env' x T t =>
-          v2 <- eval fuel' env t2 ;;
-          eval fuel' (add x (V_Fix env' x T t) env') t
-        | _ => fail
-        end
-      (* Let *)
-      | <[ let x := t1 in t2 ]> =>
-        v1 <- eval fuel' env t1 ;;
-        eval fuel' (add x v1 env) t2
-      (* If *)
-      | <[ if t1 then t2 else t3 ]> =>
-        v1 <- eval fuel' env t1 ;;
-        match v1 with
-        | V_Bool true => eval fuel' env t2
-        | V_Bool false => eval fuel' env t3
-        | _ => fail
-        end
-      (* Bop *)
-      | T_BOp bop t1 t2 =>
-        v1 <- eval fuel' env t1 ;;
-        v2 <- eval fuel' env t2 ;;
-        match v1, v2 with
-        | V_Bool b1, V_Bool b2 =>
-          match bop with
-          | And => return (V_Bool (b1 && b2))
-          | Or => return (V_Bool (b1 || b2))
-          | _ => fail
-          end
-        | V_Nat n1, V_Nat n2 =>
-          match bop with
-          | Plus => return (V_Nat (n1 + n2))
-          | Minus => return (V_Nat (n1 - n2))
-          | Mult => return (V_Nat (n1 * n2))
-          | Lt => return (V_Bool (n1 <? n2))
-          | Eq => return (V_Bool (n1 =? n2))
-          | _ => fail
-          end
-        | _, _ => fail
-        end
-      (* Uop *)
-      | T_UOp op t =>
-        v <- eval fuel' env t ;;
-        match v with
-        | V_Bool b =>
-            match op with
-            | Neg => return (V_Bool (negb b))
-            end
-        | _ => fail
-        end
-      (* Fst *)
-      | T_Fst t =>
-        v <- eval fuel' env t ;;
-        match v with
-        | V_Pair v1 _ => return v1
-        | _ => fail
-        end
-      (* Snd *)
-      | T_Snd t =>
-        v <- eval fuel' env t ;;
-        match v with
-        | V_Pair _ v2 => return v2
-        | _ => fail
-        end
-      (* Pair *)
-      | T_Pair t1 t2 =>
-        v1 <- eval fuel' env t1 ;;
-        v2 <- eval fuel' env t2 ;;
-        return (V_Pair v1 v2)
-      (* Left injection *)
-      | <[ inl T t ]>  =>
-        v <- eval fuel' env t ;;
-        return (V_Inl v)
-      (* Right injection *)
-      | <[ inr T t ]>  =>
-        v <- eval fuel' env t ;;
-        return (V_Inr v)
-      (* Case *)
-      | <[ case t of | inl y1 => t1 | inr y2 => t2 ]> =>
-        v <- eval fuel' env t ;;
-        match v with
-        | V_Inl v1 => eval fuel' (add y1 v1 env) t1
-        | V_Inr v2 => eval fuel' (add y2 v2 env) t2
-        | _ => fail
-        end
-      (* Fix *)
-      | <[ fix t ]> =>
-        v <- eval fuel' env t ;;
-        match v with
-        | V_Clo env' x T t' =>
-            eval fuel' (add x (V_Fix env' x T t) env') t'
-        | _ => fail
-        end
-      (* Values*)
-      | <[ fun x : T -> t ]> => return (V_Clo env x T t)
-      | T_Nat n => return (V_Nat n)
-      | T_Bool b => return (V_Bool b)
-      | T_Var x =>
-        v <- lookup x env ;;
-        return v
-      end
-    end.
+  Fixpoint eval (fuel : nat) (env : environment) (t : term) : option value
+  (* :=   ___ FILL IN HERE ___. *)
+  . Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
 
   (* [eval_env] grade 0/20 *)
 
@@ -1646,21 +1549,27 @@ Module EnvInterp.
       επιτυγχάνουν. *)
 
   Example example1 : eval_top 1000 test1 = Some (V_Nat 8).
-  Proof. reflexivity. Qed.
+  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
+  (* Proof. reflexivity. Qed. *)
 
   Example example2 : eval_top 1000 test2 = Some (V_Nat 15).
-  Proof. reflexivity. Qed.
+  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
+  (* Proof. reflexivity. Qed. *)
 
   Example example3 : eval_top 1000 test3 = Some (V_Nat 16).
-  Proof. reflexivity. Qed.
+  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
+  (* Proof. reflexivity. Qed. *)
 
   Example example4 : eval_top 1000 test4 = Some (V_Nat 15).
-  Proof. reflexivity. Qed.
+  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
+  (* Proof. reflexivity. Qed. *)
 
   Example example5 : eval_top 1000 myfact = Some (V_Nat 120).
-  Proof. reflexivity. Qed.
+  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
+  (* Proof. reflexivity. Qed. *)
 
   Example example6 : eval_top 1000 even_odd = Some (V_Bool true).
-  Proof. reflexivity. Qed.
+  Admitted. (* Για να ελέγξετε τον ορισμό σας, διαγράψτε αυτή τη γραμμή και κάντε uncomment την από κάτω. *)
+  (* Proof. reflexivity. Qed. *)
 
 End EnvInterp.
