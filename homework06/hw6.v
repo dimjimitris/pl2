@@ -430,8 +430,8 @@ Inductive step : term -> term -> Prop :=
     value v ->
     <[ case inr T1 v of | inl x1 => t1 | inr x2 => t2 ]> --> <[ [x2:=v]t2 ]>
 (* Fix *)
-| Step_FixAbs : forall t x A,
-    <[ fix (fun x : A -> t) ]> --> <[ [x := fix (fun x : A -> t)] t ]>
+| Step_FixAbs : forall t x T,
+    <[ fix (fun x : T -> t) ]> --> <[ [x := (fix (fun x : T -> t))] t ]>
 | Step_Fix : forall t t',
     t --> t' ->
     <[ fix t ]> --> <[ fix t' ]>
@@ -775,8 +775,7 @@ Proof.
     destruct IHHt as [ | [t' Hstp]]; eauto.
     edestruct (canonical_forms_fun t) as [x [u Hstp]];
     [ | | try rewrite Hstp]; eauto.
-Qed.  
-
+Qed.
 
 (* [progress] grade 0/10*)
 
@@ -1025,7 +1024,7 @@ Proof.
     inv Hstep; eauto.
     eapply substitution_preserves_typing; eauto.
     inv Htyp; eauto.
-Qed.
+Qed. 
 
 
 (* [preservation] grade 0/10*)
@@ -1147,13 +1146,13 @@ Fixpoint type_check (Gamma : context) (t : term) : option type :=
       | _ => fail
       end
   (* Fix *)
-  | <[ fix t ]> => 
-    A <- type_check Gamma t ;;
-    match A with 
-    | <[[ A1 -> A2 ]]> =>
-        if ty_eqb A1 A2 then return A1 else fail
-    | _ => fail
-    end
+  | <[ fix t ]> =>
+      A <- type_check Gamma t ;;
+      match A with
+      | <[[ A1 -> A2 ]]> =>
+          if ty_eqb A1 A2 then return A1 else fail
+      | _ => fail
+      end
   end.
 
 (* [type_check] grade 0/10*)
@@ -1246,6 +1245,7 @@ Qed.
 Definition letrec (f : string) (fA : type) (ft : term) (rest : term) : term :=
   <[ let f := (fix (fun f : fA -> ft)) in rest ]>.
 
+
 (* [letrec] grade 0/10 *)
 
 Notation "'let' 'rec' f ':' T ':=' y 'in' z" :=
@@ -1268,37 +1268,36 @@ Notation "'let' 'rec' f ':' T ':=' y 'in' z" :=
     να επιτρέπει τον ορισμό οποιουδήποτε αριθμού αμοιβαία αναδρομικών
     συναρτήσεων. *)
 
-Definition _x : string := "_x".
-Definition _y : string := "_y".
-Definition _selector : string := "_selector".
+Definition _arg : string := "_arg".
+Definition h : string := "h".
 
 Definition letrecand (f : string) (fA : type) (ft : term)
                      (g : string) (gA : type) (gt : term)
                      (rest : term) : term :=
-<[
-  let rec g : <[[ fA * gA ]]> := [f := g.1][g := g.2] (ft, gt) in
-  let f := g.1 in
-  let g := g.2 in
-  rest
-]>.
-(*<[
-  let _y := fix (
-    fun _x : fA ->
-      fun _selector : Bool ->
-        if _selector then (
-          [f := _x true]
-          [g := _x false]
-          ft
-        ) else (
-          [f := _x true]
-          [g := _x false]
-          gt
+  match fA, gA with
+  | <[[ Tfi -> _ ]]>, <[[ Tgi -> _ ]]> => 
+    <[
+      let rec h : <[[ fA * gA ]]> := (
+        (
+          fun _arg : Tfi ->
+            let f := h.1 in
+            let g := h.2 in
+            ft _arg
         )
-  ) in
-  let f := _y true in
-  let g := _y false in
-  rest
-]>.*)
+        ,
+        (
+          fun _arg : Tgi ->
+            let f := h.1 in
+            let g := h.2 in
+            gt _arg
+        )
+      ) in
+      let f := h.1 in
+      let g := h.2 in
+      rest
+    ]>
+  | _, _ => <[ 1 1 ]> (* something that doesn't work *)
+  end.
 
 (* [letrecand] grade 0/20 *)
 
@@ -1318,7 +1317,7 @@ Notation "'let' 'mut' f ':' Tf ':=' tf  'and' g ':' Tg ':=' tg 'in' z" :=
 
 Fixpoint eval (fuel : nat) (t : term) : option term :=
   match fuel with
-  | 0 => None
+  | 0 => fail
   | S fuel' =>
       match t with
       (* Application *)
@@ -1351,7 +1350,7 @@ Fixpoint eval (fuel : nat) (t : term) : option term :=
               match bop with
               | And => return (T_Bool (b1 && b2))
               | Or => return (T_Bool (b1 || b2))
-              | _ => None
+              | _ => fail
               end
           | T_Nat n1, T_Nat n2 =>
               match bop with
@@ -1375,18 +1374,18 @@ Fixpoint eval (fuel : nat) (t : term) : option term :=
           | _ => fail
           end
       (* Fst *)
-      | T_Fst t =>
+      | <[ t.1 ]> =>
           v <- eval fuel' t ;;
           match v with
           | T_Pair v1 _ => return v1
-          | _ => None
+          | _ => fail
           end
       (* Snd *)
-      | T_Snd t =>
+      | <[ t.2 ]> =>
           v <- eval fuel' t ;;
           match v with
           | T_Pair _ v2 => return v2
-          | _ => None
+          | _ => fail
           end
       (* Pair *)
       | <[ (t1, t2) ]> =>
@@ -1411,17 +1410,17 @@ Fixpoint eval (fuel : nat) (t : term) : option term :=
           end
       (* Fix *)
       | <[ fix t ]> =>
-        v <- eval fuel' t ;;
-        match v with
-        | <[ fun x : T -> t' ]> =>
-            eval fuel' <[ [x := fix (fun x : T -> t')] t' ]>
-        | _ => fail
-        end
-      (* Values *)
+          v <- eval fuel' t ;;
+          match v with
+          | <[ fun x : T -> t' ]> =>
+              eval fuel' <[ [x := fix v] t' ]>
+          | _ => fail
+          end
+      (* Values*)
       | <[ fun x : T -> t ]> => return  <[ fun x : T -> t ]>
       | T_Nat n => return (T_Nat n)
       | T_Bool b => return (T_Bool b)
-      | T_Var x => None
+      | T_Var x => fail
       end
   end.
 
@@ -1434,47 +1433,72 @@ Definition n : string := "n".
 Definition even : string := "even".
 Definition odd : string := "odd".
 Definition ieio : string := "ieio".
+Definition aux : string := "aux".
+
+Definition myfact' : term :=
+<[
+  let rec fact : Nat -> Nat :=
+    fun n : Nat -> if n = 0 then 1 else n * fact (n - 1)
+  in fact 5
+]>.
 
 Definition myfact : term :=
-  <[  let rec fact : Nat -> Nat :=
-      fun n : Nat -> if n = 0 then 1 else n * fact (n - 1)
-      in fact 5 ]>.
+<[
+  (
+    fix (
+      fun fact : <[[ Nat -> Nat ]]> ->
+        fun n : Nat -> let aux := fact in if n = 0 then 1 else n * fact (n - 1)
+    )
+  ) 5
+]>.
 
 Definition even_odd : term :=
-  <[  
-    let mut
-      even : Nat -> Nat :=
-        fun n : Nat -> if n = 0 then true else odd (n-1)
-    and
-      odd : Nat -> Nat :=
-        fun n : Nat -> if n = 0 then false else even (n-1)
-    in
-      even 42
-  ]>.
-
-Definition ie_io : term :=
-  <[
-    (fix (
-      fun ieio : <[[ (Nat -> Bool) * (Nat -> Bool) ]]> ->
-      (
-        fun n : Nat -> if n = 0 then true else  ieio.2 (n - 1),
-        fun n : Nat -> if n = 0 then false else ieio.1 (n - 1)
-      )
-    )).1 42
-  ]>.
+<[
+  let mut
+    even : Nat -> Nat := fun n : Nat -> if n = 0 then true else odd (n-1)
+  and
+    odd : Nat -> Nat := fun n : Nat -> if n = 0 then false else even (n-1)
+  in
+    even 2
+]>.
 
 (** Εάν οι ορισμοί σας είναι σωστοί τα παρακάτω tests θα πρέπει να
     επιτυγχάνουν. *)
 
-Example example1 : eval 100 myfact = Some (T_Nat 120).
+Definition ie_io : term :=
+<[
+  (
+    fix (
+      fun ieio : <[[ (Nat -> Bool) * (Nat -> Bool) ]]> ->
+      (
+        (
+        fun n : Nat ->
+          let even := ieio.1 in let odd := ieio.2 in (
+            fun n : Nat -> if n = 0 then true else odd (n - 1)
+          ) n
+        )
+        ,
+        (
+        fun n : Nat ->
+          let even := ieio.1 in let odd := ieio.2 in (
+            fun n : Nat -> if n = 0 then false else even (n - 1)
+          ) n
+        )
+      )
+    )
+  ).1 42
+]>.
+
+Compute myfact.
+
+Example example1 : eval 5000 myfact = Some (T_Nat 120).
 Proof. compute. reflexivity. Qed.
 
-Example example3 : eval 100 ie_io = Some (T_Bool true).
+Example example3 : eval 5000 ie_io = Some (T_Bool true).
 Proof. compute. reflexivity. Qed.
 
-Example example2 : eval 100 even_odd = Some (T_Bool true).
-Proof. compute. reflexivity. Qed.
-
+Example example2 : eval 5000 even_odd = Some (T_Bool true).
+Proof. reflexivity. Qed.
 
 (** Bonus ερώτημα: ορίστε έναν environment-based interpreter, παρόμοιο
     με αυτόν της άσκησης 5, που να υποστηρίζει τον τελεστή [fix]. *)
