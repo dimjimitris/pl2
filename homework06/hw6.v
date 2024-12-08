@@ -1302,6 +1302,8 @@ Definition letrecand (f : string) (fA : type) (ft : term)
     ]>
   | _, _ => <[ 1 1 ]>
   end.*)
+
+
 (* [letrecand] grade 0/20 *)
 
 Notation "'let' 'mut' f ':' Tf ':=' tf  'and' g ':' Tg ':=' tg 'in' z" :=
@@ -1468,7 +1470,7 @@ Definition ie_io : term :=
 Example example1 : eval 100 myfact = Some (T_Nat 120).
 Proof. reflexivity. Qed.
 
-Example example2 : eval 100 even_odd = Some (T_Bool true).
+Example example2 : eval 1000 even_odd = Some (T_Bool true).
 Proof. reflexivity. Qed.
 
 Example example4 : eval 1000 ie_io = Some (T_Bool true).
