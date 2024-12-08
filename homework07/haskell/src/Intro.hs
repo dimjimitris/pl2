@@ -123,14 +123,14 @@ Basic Types
 n1 :: Integer
 n1 = 42
 
--- >>> n
+-- >>> n1
 -- 42
 
 -- The type Int is the type of word-sized integers, which is machine dependent. 
 n1' :: Int
 n1' = 42
 
--- >>> n'
+-- >>> n1'
 -- 42
 
 -- Definitions don't have to be in order 
@@ -154,8 +154,8 @@ f1 = 123.456
 b1 :: Bool
 b1 = True && (False :: Bool) || (n2 == 42)
 
--- >>> b
--- True
+-- >>> b1
+-- False
 
 -- Strings
 hello :: String 
@@ -168,7 +168,7 @@ hello' :: [Char]
 hello' = hello
 
 -- >>> hello'
--- "Hello world!"
+-- "Hello world!!"
 
 -- Unit type
 unit :: ()

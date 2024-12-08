@@ -1274,8 +1274,13 @@ Definition h : string := "h".
 Definition letrecand (f : string) (fA : type) (ft : term)
                      (g : string) (gA : type) (gt : term)
                      (rest : term) : term :=
-  match fA, gA with
-  | <[[ Tfi -> _ ]]>, <[[ Tgi -> _ ]]> => 
+<[
+    let rec f : fA := let rec g : gA := gt in ft in
+    let rec g : gA := let rec f : fA := ft in gt in
+    rest
+  ]>.
+(*  match fA, gA with
+  | <[[Tfi -> _]]>, <[[Tgi -> _]]> =>
     <[
       let rec h : <[[ fA * gA ]]> := (
         (
@@ -1283,8 +1288,7 @@ Definition letrecand (f : string) (fA : type) (ft : term)
             let f := h.1 in
             let g := h.2 in
             ft _arg
-        )
-        ,
+        ),
         (
           fun _arg : Tgi ->
             let f := h.1 in
@@ -1296,9 +1300,8 @@ Definition letrecand (f : string) (fA : type) (ft : term)
       let g := h.2 in
       rest
     ]>
-  | _, _ => <[ 1 1 ]> (* something that doesn't work *)
-  end.
-
+  | _, _ => <[ 1 1 ]>
+  end.*)
 (* [letrecand] grade 0/20 *)
 
 Notation "'let' 'mut' f ':' Tf ':=' tf  'and' g ':' Tg ':=' tg 'in' z" :=
@@ -1350,7 +1353,7 @@ Fixpoint eval (fuel : nat) (t : term) : option term :=
               match bop with
               | And => return (T_Bool (b1 && b2))
               | Or => return (T_Bool (b1 || b2))
-              | _ => fail
+              | _ => None
               end
           | T_Nat n1, T_Nat n2 =>
               match bop with
@@ -1374,21 +1377,21 @@ Fixpoint eval (fuel : nat) (t : term) : option term :=
           | _ => fail
           end
       (* Fst *)
-      | <[ t.1 ]> =>
+      | T_Fst t =>
           v <- eval fuel' t ;;
           match v with
           | T_Pair v1 _ => return v1
-          | _ => fail
+          | _ => None
           end
       (* Snd *)
-      | <[ t.2 ]> =>
+      | T_Snd t =>
           v <- eval fuel' t ;;
           match v with
           | T_Pair _ v2 => return v2
-          | _ => fail
+          | _ => None
           end
       (* Pair *)
-      | <[ (t1, t2) ]> =>
+      | T_Pair t1 t2 =>
           v1 <- eval fuel' t1 ;;
           v2 <- eval fuel' t2 ;;
           return <[ (v1, v2) ]>
@@ -1405,22 +1408,21 @@ Fixpoint eval (fuel : nat) (t : term) : option term :=
           v <- eval fuel' t ;;
           match v with
           | <[ inl T v1 ]>  => eval fuel' <[ [y1 := v1] t1 ]> 
-          | <[ inr T v2 ]> => eval fuel' <[ [y2 := v2] t1 ]>
+          | <[ inr T v2 ]> => eval fuel' <[ [y2 := v2] t2 ]>
           | _ => fail
           end
       (* Fix *)
-      | <[ fix t ]> =>
-          v <- eval fuel' t ;;
-          match v with
-          | <[ fun x : T -> t' ]> =>
-              eval fuel' <[ [x := fix v] t' ]>
-          | _ => fail
-          end
+      | <[ fix t ]> => 
+        v <- eval fuel' t ;;
+        match v with
+        | <[ fun x : T -> t' ]> => eval fuel' <[ [x := fix t] t' ]>
+        | _ => None
+        end
       (* Values*)
       | <[ fun x : T -> t ]> => return  <[ fun x : T -> t ]>
       | T_Nat n => return (T_Nat n)
       | T_Bool b => return (T_Bool b)
-      | T_Var x => fail
+      | T_Var x => None
       end
   end.
 
@@ -1432,70 +1434,27 @@ Definition fact : string := "fact".
 Definition n : string := "n".
 Definition even : string := "even".
 Definition odd : string := "odd".
-Definition ieio : string := "ieio".
-Definition aux : string := "aux".
-
-Definition myfact' : term :=
-<[
-  let rec fact : Nat -> Nat :=
-    fun n : Nat -> if n = 0 then 1 else n * fact (n - 1)
-  in fact 5
-]>.
 
 Definition myfact : term :=
-<[
-  (
-    fix (
-      fun fact : <[[ Nat -> Nat ]]> ->
-        fun n : Nat -> let aux := fact in if n = 0 then 1 else n * fact (n - 1)
-    )
-  ) 5
-]>.
+  <[ let rec fact : Nat -> Nat :=
+       fun n : Nat -> if n = 0 then 1 else n * fact (n - 1)
+     in fact 5 ]>.
 
 Definition even_odd : term :=
-<[
-  let mut
-    even : Nat -> Nat := fun n : Nat -> if n = 0 then true else odd (n-1)
-  and
-    odd : Nat -> Nat := fun n : Nat -> if n = 0 then false else even (n-1)
-  in
-    even 2
-]>.
+  <[
+    let mut
+      even : Nat -> Bool := fun n : Nat -> if n = 0 then true else odd (n-1)
+    and
+      odd : Nat -> Bool := fun n : Nat -> if n = 0 then false else even (n-1)
+    in
+      even 2
+  ]>.
 
 (** Εάν οι ορισμοί σας είναι σωστοί τα παρακάτω tests θα πρέπει να
     επιτυγχάνουν. *)
 
-Definition ie_io : term :=
-<[
-  (
-    fix (
-      fun ieio : <[[ (Nat -> Bool) * (Nat -> Bool) ]]> ->
-      (
-        (
-        fun n : Nat ->
-          let even := ieio.1 in let odd := ieio.2 in (
-            fun n : Nat -> if n = 0 then true else odd (n - 1)
-          ) n
-        )
-        ,
-        (
-        fun n : Nat ->
-          let even := ieio.1 in let odd := ieio.2 in (
-            fun n : Nat -> if n = 0 then false else even (n - 1)
-          ) n
-        )
-      )
-    )
-  ).1 42
-]>.
-
-Compute myfact.
-
 Example example1 : eval 5000 myfact = Some (T_Nat 120).
-Proof. compute. reflexivity. Qed.
-
-Example example3 : eval 5000 ie_io = Some (T_Bool true).
-Proof. compute. reflexivity. Qed.
+Proof. reflexivity. Qed.
 
 Example example2 : eval 5000 even_odd = Some (T_Bool true).
 Proof. reflexivity. Qed.
@@ -1546,9 +1505,113 @@ Module EnvInterp.
 
   Definition environment : Type := var_map value.
 
-  Fixpoint eval (fuel : nat) (env : environment) (t : term) : option value
-  (* :=   ___ FILL IN HERE ___. *)
-  . Admitted. (* Διαγράψτε αυτή τη γραμμή και συμπληρώστε την από πάνω *)
+  Fixpoint eval (fuel : nat) (env : environment) (t : term) : option value :=
+    match fuel with
+    | 0 => fail
+    | S fuel' =>
+        match t with
+        (* Application *)
+        | <[ t1 t2 ]> =>
+            v1 <- eval fuel' t1 ;;
+            match v1 with
+            | <[ fun x : T -> t' ]> =>
+                v2 <- eval fuel' t2 ;;
+                eval fuel' <[ [x := v2] t' ]>
+            | _ => fail
+            end
+        (* Let *)
+        | <[ let x := t1 in t2]> =>
+            v <- eval fuel' t1 ;;
+            eval fuel' <[ [x := v] t2 ]>
+        (* If *)
+        | <[ if t1 then t2 else t3 ]> =>
+            v <-  eval fuel' t1 ;;
+            match v with
+            | T_Bool true => eval fuel' t2
+            | T_Bool false => eval fuel' t3
+            | _ => fail
+            end
+        (* Bop *)
+        | T_BOp bop t1 t2 =>
+            v1 <- eval fuel' t1 ;;
+            v2 <- eval fuel' t2 ;;
+            match v1, v2 with
+            | T_Bool b1, T_Bool b2 =>
+                match bop with
+                | And => return (T_Bool (b1 && b2))
+                | Or => return (T_Bool (b1 || b2))
+                | _ => None
+                end
+            | T_Nat n1, T_Nat n2 =>
+                match bop with
+                | Plus => return (T_Nat (n1 + n2))
+                | Minus => return (T_Nat (n1 - n2))
+                | Mult => return (T_Nat (n1 * n2))
+                | Lt => return (T_Bool (n1 <? n2))
+                | Eq => return (T_Bool (n1 =? n2))
+                | _ => fail
+                end
+            | _, _ => fail
+            end
+        (* Uop *)
+        | T_UOp op t =>
+            v <- eval fuel' t ;;
+            match v with
+            | T_Bool b =>
+                match op with
+                | Neg => return (T_Bool (negb b))
+                end
+            | _ => fail
+            end
+        (* Fst *)
+        | T_Fst t =>
+            v <- eval fuel' t ;;
+            match v with
+            | T_Pair v1 _ => return v1
+            | _ => None
+            end
+        (* Snd *)
+        | T_Snd t =>
+            v <- eval fuel' t ;;
+            match v with
+            | T_Pair _ v2 => return v2
+            | _ => None
+            end
+        (* Pair *)
+        | T_Pair t1 t2 =>
+            v1 <- eval fuel' t1 ;;
+            v2 <- eval fuel' t2 ;;
+            return <[ (v1, v2) ]>
+        (* Left injection *)
+        | <[ inl T t ]>  =>
+            v <- eval fuel' t ;;
+            return <[ inl T v ]>
+        (* Right injection *)
+        | <[ inr T t ]>  =>
+            v <- eval fuel' t ;;
+            return <[ inr T v ]>
+        (* Case *)
+        | <[ case t of | inl y1 => t1 | inr y2 => t2 ]> =>
+            v <- eval fuel' t ;;
+            match v with
+            | <[ inl T v1 ]>  => eval fuel' <[ [y1 := v1] t1 ]> 
+            | <[ inr T v2 ]> => eval fuel' <[ [y2 := v2] t2 ]>
+            | _ => fail
+            end
+        (* Fix *)
+        | <[ fix t ]> => 
+          v <- eval fuel' t ;;
+          match v with
+          | <[ fun x : T -> t' ]> => eval fuel' <[ [x := fix t] t' ]>
+          | _ => None
+          end
+        (* Values*)
+        | <[ fun x : T -> t ]> => return  <[ fun x : T -> t ]>
+        | T_Nat n => return (T_Nat n)
+        | T_Bool b => return (T_Bool b)
+        | T_Var x => None
+        end
+    end.
 
   (* [eval_env] grade 0/20 *)
 
