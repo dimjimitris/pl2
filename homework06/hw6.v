@@ -1526,25 +1526,12 @@ Module EnvInterp.
     | S fuel' =>
         match t with
         (* Application *)
-        | <[ t1 t2 ]> => (*
-          v1 <- eval fuel' env t1 ;; v2 <- eval fuel' env t2 ;;
-          match v1, v2 with
-          | V_Clo env' x _ t, v2 => eval fuel' (add x v2 env') t
-          | V_Fix env' x _ t, v2 =>
-            v3 <- eval fuel' (add x v1 env') t ;;
-            match v3 with
-            | V_Clo env'' y _ t' => eval fuel' (add y v2 env'') t'
-            | _ => None
-            end
-          | _, _ => None
-          end*)
+        | <[ t1 t2 ]> => 
           v1 <- eval fuel' env t1 ;;
           match v1 with
           | V_Clo env' x _ t =>
             v2 <- eval fuel' env t2 ;;
             eval fuel' (add x v2 env') t
-          | V_Fix env' x _ t =>
-            eval fuel' (add x v1 env) <[ t t2 ]>
           | _ => None
           end
         (* Let *)
@@ -1594,12 +1581,6 @@ Module EnvInterp.
             v <- eval fuel' env t ;;
             match v with
             | V_Pair v1 _ => return v1
-            | V_Fix env' x _ t' =>
-              v' <- eval fuel' env' t' ;;
-              match v' with
-              | V_Pair v1 _ => return v1
-              | _ => None
-              end
             | _ => None
             end
         (* Snd *)
@@ -1607,12 +1588,6 @@ Module EnvInterp.
             v <- eval fuel' env t ;;
             match v with
             | V_Pair _ v2 => return v2
-            | V_Fix env' x _ t' =>
-              v' <- eval fuel' env' t' ;;
-              match v' with
-              | V_Pair _ v2 => return v2
-              | _ => None
-              end
             | _ => None
             end
         (* Pair *)
@@ -1647,7 +1622,12 @@ Module EnvInterp.
         | <[ fun x : T -> t ]> => return (V_Clo env x T t)
         | T_Nat n => return (V_Nat n)
         | T_Bool b => return (V_Bool b)
-        | T_Var x => lookup x env
+        | T_Var x => 
+          val <- lookup x env ;;
+          match val with
+          | V_Fix env' x T t' => eval fuel' (add x (V_Fix env' x T t') env') t'
+          | val => return val
+          end
         end
     end.
 
@@ -1695,19 +1675,7 @@ Module EnvInterp.
   Example example6 : eval_top 1000 even_odd = Some (V_Bool true).
   Proof. reflexivity. Qed.
 
-  Definition test5 : term :=
-    <[
-      (
-        fix (
-          fun ieio : <[[(Nat -> Bool) * (Nat -> Bool) ]]> -> (
-            fun n : Nat -> if n = 0 then true else ieio.2 (n - 1),
-            fun n : Nat -> if n = 0 then false else ieio.1 (n - 1)
-          )
-        )
-      ).2 1
-    ]>.
-
-  Example example7 : eval_top 1000 test5 = Some (V_Bool true).
+  Example example7 : eval_top 1000 ie_io = Some (V_Bool true).
   Proof. reflexivity. Qed.
 
 End EnvInterp.
