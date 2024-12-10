@@ -1300,7 +1300,7 @@ Definition letrecand (f : string) (fA : type) (ft : term)
       let g := h.2 in
       rest
     ]>
-  | _, _ => <[ 1 1 ]>
+  | _, _ => <[ 1 1 ]> (** Ένα πρόγραμμα που θα πετάξει error *)
   end.*)
 
 
