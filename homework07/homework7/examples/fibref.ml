@@ -9,4 +9,4 @@ let rec fib (n : int) : () =
     fib (n - 1)
 in
 let t : () = fib 8 in 
-!curr
+!prev

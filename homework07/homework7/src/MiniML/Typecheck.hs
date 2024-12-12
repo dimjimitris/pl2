@@ -132,9 +132,9 @@ typeCheck env (Let _ x t e1 e2) = do
     if t1 == t then typeCheck (M.insert x t env) e2
     else typeError (getPosn e1) ("Expression is expected to have type " <> showType t <> " but has type " <> showType t1)
 -- Let rec
-typeCheck env (LetRec _ f arg argt rett body rest) =
-    let ftype = TArrow argt rett in do
-    t <- typeCheck (M.insert f ftype (M.insert arg argt env)) body
+typeCheck env (LetRec _ f arg argt rett body rest) = do
+    let ftype = TArrow argt rett
+    t <- typeCheck (M.insert f ftype $ M.insert arg argt env) body
     if t == rett then typeCheck (M.insert f ftype env) rest
     else typeError (getPosn body) ("Function Body is expected to have type " <> showType rett <> " but has type " <> showType t)
 -- References

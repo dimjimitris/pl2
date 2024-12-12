@@ -6,6 +6,7 @@ import Control.Monad.State
 import MiniML.Syntax
 import MiniML.Error
 import MiniML.Values
+import Control.Monad.RWS (MonadReader(local))
 
 
 -- MiniML evaluation
@@ -189,7 +190,8 @@ eval (Case _ e y1 e1 y2 e2) = do
 -- Let rec
 eval (LetRec _ f x t r b rest) = do
     env <- getEnv
-    localEnv (M.insert f (VClo env f x t r b) env) $ eval rest
+    let closure = VClo (M.insert f closure env) f x t r b
+    localEnv (M.insert f closure env) $ eval rest
 -- Assignment to Reference
 eval (Asgn _ e1 e2) = do
     v1 <- eval e1
