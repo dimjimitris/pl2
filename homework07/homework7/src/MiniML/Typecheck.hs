@@ -143,8 +143,8 @@ typeCheck env (Asgn _ left right) = do
     tr <- typeCheck env right
     case tl of
         TRef t -> if t == tr then return TUnit
-                  else typeError (getPosn right) ("Assignor expression is expected to have type " <> showType t <> " but has type " <> showType tr)
-        _ -> typeError (getPosn left) ("Assignee expression is expected to have type ref but has type " <> showType tl)
+                  else typeError (getPosn right) ("Value expression is expected to have type " <> showType t <> " but has type " <> showType tr)
+        _ -> typeError (getPosn left) ("Target expression is expected to have type ref but has type " <> showType tl)
 typeCheck env (Deref _ e) = do
     t <- typeCheck env e
     case t of
