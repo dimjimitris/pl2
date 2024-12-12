@@ -132,11 +132,27 @@ typeCheck env (Let _ x t e1 e2) = do
     if t1 == t then typeCheck (M.insert x t env) e2
     else typeError (getPosn e1) ("Expression is expected to have type " <> showType t <> " but has type " <> showType t1)
 -- Let rec
-typeCheck _ (LetRec _ _ _ _ _ _ _) = error "FILL IN HERE"
+typeCheck env (LetRec _ f arg argt rett body rest) =
+    let ftype = TArrow argt rett in do
+    t <- typeCheck (M.insert f ftype (M.insert arg argt env)) body
+    if t == rett then typeCheck (M.insert f ftype env) rest
+    else typeError (getPosn body) ("Function Body is expected to have type " <> showType rett <> " but has type " <> showType t)
 -- References
-typeCheck _ (Asgn _ _ _) = error "FILL IN HERE"
-typeCheck _ (Deref _ _) = error "FILL IN HERE"
-typeCheck _  (Ref _ _) = error "FILL IN HERE"
+typeCheck env (Asgn _ left right) = do
+    tl <- typeCheck env left
+    tr <- typeCheck env right
+    case tl of
+        TRef t -> if t == tr then return TUnit
+                  else typeError (getPosn right) ("Assignor expression is expected to have type " <> showType t <> " but has type " <> showType tr)
+        _ -> typeError (getPosn left) ("Assignee expression is expected to have type ref but has type " <> showType tl)
+typeCheck env (Deref _ e) = do
+    t <- typeCheck env e
+    case t of
+        TRef t' -> return t'
+        _ -> typeError (getPosn e) ("Expression is expected to have type ref but has type " <> showType t)
+typeCheck env  (Ref _ e) = do
+    t <- typeCheck env e
+    return $ TRef t
 
 -- Top-level typechecking function with an empty context
 typeCheckTop :: Exp -> Error Type
