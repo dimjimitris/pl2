@@ -134,7 +134,7 @@ typeCheck env (Let _ x t e1 e2) = do
 -- Let rec
 typeCheck env (LetRec _ f arg argt rett body rest) = do
     let ftype = TArrow argt rett
-    t <- typeCheck (M.insert f ftype $ M.insert arg argt env) body
+    t <- typeCheck (M.insert arg argt $ M.insert f ftype env) body
     if t == rett then typeCheck (M.insert f ftype env) rest
     else typeError (getPosn body) ("Function Body is expected to have type " <> showType rett <> " but has type " <> showType t)
 -- References
@@ -231,10 +231,10 @@ typeCheckV senv (VInr t1 v2) = do
   return $ TSum t1 t2
 -- Closures
 typeCheckV senv (VClo venv f x t1 t2 e) = do
-  tenv <- mapM (typeCheckV senv) venv
+  tenv <- mapM (typeCheckV senv) (M.delete f venv)
   t2' <- typeCheck (M.insert x t1 (M.insert f (TArrow t1 t2) tenv)) e
   if t2 == t2' then return (TArrow t1 t2')
-  else  typeError nowhere ("Type error")
+  else  typeError nowhere "Type error"
 -- Locations
 typeCheckV senv (Memloc l) = case M.lookup l senv of
     Just typ -> return typ

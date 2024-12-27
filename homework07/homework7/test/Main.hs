@@ -3,17 +3,25 @@ module Main (main) where
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import MiniML
+import Data.Proxy
 import Gen
+
+import Test.Tasty.Ingredients
+import Test.Tasty.Options
+import Test.Tasty.Runners
 
 -- The main testing function. Runs a series of tests. Add as many additional
 -- tests as you want.
 
+ingredients :: [Ingredient]
+ingredients = [consoleTestReporter, includingOptions [Option (Proxy :: Proxy QuickCheckTests)]]
+
 main :: IO ()
-main = defaultMain $ testGroup "act"
+main = defaultMainWithIngredients ingredients $ localOption (QuickCheckTests 100) $ testGroup "act"
   [ testProperty "Parser round trip" parserRoundTrip
-  , testProperty "Typechecker" genTExpWellTyped
+  ,  testProperty "Typechecker" genTExpWellTyped
   , testProperty "Type soundness" typeSoundness
-  , testProperty "Placeholder" someProperty ]
+  ]
 
 -- For any program in abstact syntax, pretty-printing it and parsing it
 -- produces the original program (i.e., `parse . lex . showExp == id`)
@@ -52,10 +60,15 @@ parserRoundTrip =
 
 
 genTExpWellTyped :: Property
-genTExpWellTyped = counterexample "FILL IN HERE!" False
+genTExpWellTyped = forAll genExpType $ \(e, t) ->
+  case typeCheckTop e of
+    Left err -> whenFail (prettyErrs (showExp e) err) (counterexample "Typechecking failed!" False)
+    Right t' -> t === t'
 
 typeSoundness :: Property
-typeSoundness = counterexample "FILL IN HERE!" False
-
-someProperty :: Property
-someProperty = forAll (choose (5,10 :: Int)) (<= 10)
+typeSoundness = forAll genExpType $ \(e, t) ->
+  case evalTop e of
+    Left err -> whenFail (prettyErrs (showExp e) err) (counterexample "Evaluation failed!" False)
+    Right (v, s) -> case typeCheckVTop s v of
+      Left err -> whenFail (prettyErrs (showExp e) err) (counterexample "Typechecking failed!" False)
+      Right t' -> t === t'

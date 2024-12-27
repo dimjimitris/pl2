@@ -81,15 +81,229 @@ genTExpSize :: M.Map Type [String]  -- a map from types to variables with the co
             -> Type                 -- the type of the generated terms
             -> Int                  -- The size of the term.
             -> Gen Exp
-genTExpSize _ _ t _ =
+genTExpSize env next t sz =
   case t of
-    TBool        -> error "FILL IN HERE"
-    TInt         -> error "FILL IN HERE"
-    TUnit        -> error "FILL IN HERE"
-    TSum _ _     -> error "FILL IN HERE"
-    TProd _ _    -> error "FILL IN HERE"
-    TArrow _ _   -> error "FILL IN HERE"
-    TRef _       -> error "FILL IN HERE"
+    TUnit ->
+      frequency $ (6, genLit) : if sz <= 0 then [] else [
+                    (4, genAssign),
+                    (2, genApp),
+                    (2, genFst),
+                    (2, genSnd),
+                    (2, genCase),
+                    (2, genLet),
+                    (2, genITE),
+                    (2, genDeref),
+                    (1, genLetRec)
+                  ]
+                  ++ zip [1..] genVar'
+
+    TInt ->
+      frequency $ (6, genLit) : if sz <= 0 then [] else [
+                  (4, genBop'),
+                  (3, genApp),
+                  (3, genCase),
+                  (3, genLet),
+                  (2, genITE),
+                  (2, genFst),
+                  (2, genSnd),
+                  (2, genDeref),
+                  (1, genLetRec)
+                  ]
+                  ++ zip [1..] genVar'
+
+    TBool ->
+      frequency $ (6, genLit) : if sz <= 0 then [] else [
+                    (4, genBop'),
+                    (4, genUop),
+                    (3, genApp),
+                    (3, genCase),
+                    (3, genLet),
+                    (2, genFst),
+                    (2, genSnd),
+                    (2, genITE),
+                    (2, genDeref),
+                    (1, genLetRec)
+                  ]
+                  ++ zip [1..] genVar'
+
+    TArrow t1 t2 ->
+      frequency $ (6, genAbs t1 t2) : if sz <= 0 then [] else [
+                    (3, genLet),
+                    (3, genApp),
+                    (2, genFst),
+                    (2, genSnd),
+                    (2, genITE),
+                    (2, genCase),
+                    (2, genDeref),
+                    (1, genLetRec)
+                  ]
+                  ++ zip [1..] genVar'
+
+    TProd t1 t2 ->
+      frequency $ (6, genPair t1 t2) : if sz <= 0 then [] else [
+                    (3, genLet),
+                    (3, genApp),
+                    (3, genITE),
+                    (3, genCase),
+                    (2, genFst),
+                    (2, genSnd),
+                    (2, genDeref),
+                    (1, genLetRec)
+                  ]
+                  ++ zip [1..] genVar'
+
+    TSum t1 t2 ->
+      frequency $ [ (6, genInl t1 t2),
+                    (6, genInr t1 t2) ]
+                  ++ if sz <= 0 then [] else [
+                    (3, genLet),
+                    (3, genApp),
+                    (3, genITE),
+                    (3, genCase),
+                    (2, genFst),
+                    (2, genSnd),
+                    (2, genDeref),
+                    (1, genLetRec)
+                  ]
+                  ++ zip [1..] genVar'
+
+    TRef t' ->
+      frequency $ (6, genRef t') : if sz <= 0 then [] else [
+                    (4, genLet),
+                    (4, genApp),
+                    (4, genITE),
+                    (3, genCase),
+                    (3, genFst),
+                    (3, genSnd),
+                    (3, genDeref),
+                    (1, genLetRec)
+                  ]
+                  ++ zip [1..] genVar'
+  where
+    -- var
+    genVar' = case M.lookup t env of
+      Just xs -> [elements (fmap (Var nowhere) xs)]
+      Nothing -> []
+
+    -- application
+    genApp = do
+      t1 <- genType
+      e1 <- genTExpSize env next (TArrow t1 t) (sz - 1)
+      e2 <- genTExpSize env next t1 (sz - 1)
+      return $ App nowhere e1 e2
+
+    -- abstraction
+    genAbs t1 t2 = do
+      let name = "x_" ++ show next
+      let env' = addVar name t1 env
+      body <- genTExpSize env' (next + 1) t2 (sz - 1)
+      return $ Abs nowhere name t1 (Just t2) body
+
+    -- unit, integers, booleans
+    genLit =
+      case t of
+        TUnit -> return (Unit nowhere) -- consider units to be literals for simplicity
+        TInt -> liftM (NumLit nowhere) arbitrary
+        TBool -> liftM (BoolLit nowhere) arbitrary
+        _ -> error $ "genLit: invalid literal type: " ++ show t
+
+    -- if-then-else
+    genITE = do
+      e1 <- genTExpSize env next TBool (sz - 1)
+      e2 <- genTExpSize env next t (sz - 1)
+      e3 <- genTExpSize env next t (sz - 1)
+      return $ ITE nowhere e1 e2 e3
+
+    -- arithmetic bops, logical bops, comparison bops
+    genBop' =
+      case t of
+        TInt -> do
+          op <- intIntBop
+          e1 <- genTExpS TInt
+          e2 <- if op == Div then genNonZeroTInt else genTExpS TInt
+          return $ Bop nowhere op e1 e2
+        TBool -> oneof [liftM3 (Bop nowhere) boolBoolBop (genTExpS TBool) (genTExpS TBool),
+                        liftM3 (Bop nowhere) intBoolBop (genTExpS TInt) (genTExpS TInt)]
+        _ -> error $ "genBop': invalid binary operator type: " ++ show t
+      where
+        intIntBop = elements [Plus, Minus, Mult, Div]
+        boolBoolBop = elements [And, Or]
+        intBoolBop = elements [Lt, Gt, Le, Ge, Eq]
+        -- second expression in division will always an int literal, but that's fine
+        genNonZeroTInt = do
+          n <- arbitrary
+          if n == 0 then genNonZeroTInt else return $ NumLit nowhere n
+
+    -- boolean uops
+    genUop = liftM (Uop nowhere Not) (genTExpS TBool)
+
+    -- pair
+    genPair t1 t2 = liftM2 (Pair nowhere) (genTExpS t1) (genTExpS t2)
+
+    -- fst
+    genFst = do
+      t2 <- genType
+      e <- genTExpS (TProd t t2)
+      return $ Fst nowhere e
+
+    -- snd
+    genSnd = do
+      t1 <- genType
+      e <- genTExpS (TProd t1 t)
+      return $ Snd nowhere e
+
+    -- inl
+    genInl t1 t2 = liftM (Inl nowhere t2) (genTExpS t1)
+
+    -- inr
+    genInr t1 t2 = liftM (Inr nowhere t1) (genTExpS t2)
+
+    -- case
+    genCase = do
+      t1 <- genType
+      t2 <- genType
+      e <- genTExpS (TSum t1 t2)
+      let name1 = "y1_" ++ show next
+      let name2 = "y2_" ++ show next
+      let env1 = addVar name1 t1 env
+      let env2 = addVar name2 t2 env
+      e1 <- genTExpSize env1 (next + 1) t (sz - 1)
+      e2 <- genTExpSize env2 (next + 1) t (sz - 1)
+      return $ Case nowhere e name1 e1 name2 e2
+
+    -- let
+    genLet = do
+      let name = "x_" ++ show next
+      t' <- genType
+      e <- genTExpS t'
+      let env' = addVar name t' env
+      rest <- genTExpSize env' (next + 1) t (sz - 1)
+      return $ Let nowhere name t' e rest
+
+    -- let rec
+    genLetRec = do
+      let xname = "x_" ++ show next
+      xt <- genType
+      let fname = "f_" ++ show next
+      let env' = addVar fname (TArrow xt t) env
+      body <- genTExpSize (addVar xname xt env') (next + 1) t (sz - 1)
+      rest <- genTExpSize env' (next + 1) t (sz - 1)
+      return $ LetRec nowhere fname xname xt t body rest
+
+    -- reference
+    genRef t' = do
+      liftM (Ref nowhere) (genTExpS t')
+
+    -- assignment
+    genAssign = liftM2 (Asgn nowhere) (genTExpS (TRef t)) (genTExpS t)
+
+    -- dereference
+    genDeref = liftM (Deref nowhere) (genTExpS (TRef t))
+
+    -- helper functions
+    genTExpS t' = genTExpSize env next t' (sz - 1)
+    addVar x typ = M.insertWith (++) typ [x] -- (returns a function that takes an environment and adds a variable to it)
+
 
 
 
