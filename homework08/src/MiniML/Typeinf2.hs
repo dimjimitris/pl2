@@ -1,4 +1,4 @@
-module MiniML.Typeinf where
+module MiniML.TypeinfAux where
 
 import qualified Data.Map as M
 import Control.Monad.State
@@ -8,6 +8,8 @@ import MiniML.Syntax
 import MiniML.Error
 import MiniML.Print -- For better error messages
 import Debug.Trace -- Debug.Trace is your friend
+
+import Data.Maybe (fromMaybe)
 
 -- A Typing context
 type Ctx = M.Map String TypeScheme
@@ -40,35 +42,57 @@ freshTVar = do
 typeError :: Posn -> String -> Error a
 typeError p msg = Left (p, msg)
 
+
 -- Constraint unification
 unify :: Constraints -> Error Substitution
 unify [] = return M.empty
-unify ((t1, t2, pos): c) = case (t1, t2) of
-  -- cases described in README.md
+unify ((t1, t2, pos):c) = case (t1, t2) of
+  (TUnit, TUnit) -> unify c
+  (TInt, TInt) -> unify c
+  (TBool, TBool) -> unify c
+  (TArrow t11 t12, TArrow t21 t22) -> unify $ (t11, t21, pos):(t12, t22, pos):c
+  (TProd t11 t12, TProd t21 t22) -> unify $ (t11, t21, pos):(t12, t22, pos):c
+  (TSum t11 t12, TSum t21 t22) -> unify $ (t11, t21, pos):(t12, t22, pos):c
+  (TList t1', TList t2') -> unify $ (t1', t2', pos):c
   (TVar a, TVar b) | a == b -> unify c
   (TVar a, t) | not $ occursFreeType a t -> do
     let subst = M.singleton a t
     let c' = applySubstCnstr c subst
     s <- unify c'
-    return $ composeSubst s subst
-  (t, TVar a) -> unify $ (TVar a, t, pos):c -- just flip it, the previous case will handle it
-  (TArrow t11 t12, TArrow t21 t22) ->
-    unify $ (t11, t21, pos):(t12, t22, pos):c
-  -- rest of the cases...
-  (TUnit, TUnit) -> unify c
-  (TInt, TInt) -> unify c
-  (TBool, TBool) -> unify c
-  (TProd t11 t12, TProd t21 t22) ->
-    unify $ (t11, t21, pos):(t12, t22, pos):c
-  (TSum t11 t12, TSum t21 t22) ->
-    unify $ (t11, t21, pos):(t12, t22, pos):c
-  (TList t1', TList t2') -> unify $ (t1', t2', pos):c
+    return $ M.insert a t s
+  (t, TVar a) -> unify $ (TVar a, t, pos):c
   _ -> typeError pos $ "Cannot unify " <> showType t1 <> " with " <> showType t2
-
 
 -- Constraint and type generation
 inferType :: Ctx -> Exp -> TypeInf (Type, Constraints)
-inferType = error "Implement me!"
+
+-- literals
+inferType _ (Unit _) = return (TUnit, [])
+inferType _ (NumLit _ _) = return (TInt, [])
+inferType _ (BoolLit _ _) = return (TBool, [])
+
+-- variables
+inferType ctx (Var pos x) =
+  case M.lookup x ctx of
+    Just (Type t) -> return (t, [])
+    Nothing -> lift $ typeError pos $ "Unbound variable " <> x
+    _ -> lift $ typeError pos $ "Type scheme for " <> x <> " is not a type"
+
+-- function application
+inferType ctx (App pos e1 e2) = do
+  (t1, c1) <- inferType ctx e1
+  (t2, c2) <- inferType ctx e2
+  a <- freshTVar
+  let constraints = [(t1, TArrow t2 (TVar a), pos)]
+  return (TVar a, constraints ++ c1 ++ c2)
+
+-- function abstraction (fun (x : sargt) : srett -> body)
+inferType ctx (Abs pos x sargt srett body) = do
+  a <- freshTVar
+  let argt = Data.Maybe.fromMaybe (TVar a) sargt -- in case sargt is Nothing
+  let ctx' = M.insert x (Type argt) ctx
+  (rett, c) <- inferType ctx' body
+  return (TArrow)
 
 
 -- Top-level type inference function with an empty context
@@ -104,29 +128,19 @@ applySubstTypeScheme (Forall xs t) subst = Forall xs $ applySubst t (foldr M.del
 applySubstEnv :: Ctx -> Substitution -> Ctx
 applySubstEnv ctx subst = M.map (`applySubstTypeScheme` subst) ctx
 
--- compose two substitutions (e.g. s1 . s2 (t) = s1(s2(t)))
-composeSubst :: Substitution -> Substitution -> Substitution
-composeSubst s1 s2 = M.map (`applySubst` s1) s2 `M.union` s1
 
 -- Extend a substitution. Essentially the composition of a substitution subst
 -- with a singleton substitution [x -> typ].
 extendSubst :: Substitution -> String -> Type -> Substitution
-extendSubst subst x typ = composeSubst subst $ M.singleton x typ
+extendSubst = error "Implement me!"
 
 -- Instantiate universal type variables with fresh ones
 instantiate :: TypeScheme -> TypeInf Type
-instantiate (Type t) = return t
-instantiate (Forall xs t) = do
-  freshVars <- mapM (const freshTVar) xs
-  let s = M.fromList $ zip xs (TVar <$> freshVars)
-  return $ applySubst t s
+instantiate = error "Implement me!"
 
 -- Generalize a the free type variables in a type
--- need to implement a function that collects free type variables
--- so we can find the free variables in `t` but not in `ctx`.
 generalize :: Ctx -> Type -> TypeScheme
-generalize ctx t = Forall (nub $ freeTypeVars t) t
-  where freeTypeVars = error "Implement me!"
+generalize = error "Implement me!"
 
 
 -- Rename a free type variable in a type
