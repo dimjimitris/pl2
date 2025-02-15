@@ -125,9 +125,11 @@ instantiate (Forall xs t) = do
 -- need to implement a function that collects free type variables
 -- so we can find the free variables in `t` but not in `ctx`.
 generalize :: Ctx -> Type -> TypeScheme
-generalize ctx t = Forall (nub $ freeTypeVars t) t
-  where freeTypeVars = error "Implement me!"
-
+generalize ctx t =
+  let freeVars = nub $ freeTypeVars t
+      ctxVars = nub $ concatMap freeTypeVars $ M.elems ctx
+      vars = filter (`notElem` ctxVars) freeVars
+  in Forall vars t
 
 -- Rename a free type variable in a type
 rename :: (String, String) -> Type -> Type
@@ -139,6 +141,17 @@ rename subst (TProd t1 t2) = TProd (rename subst t1) (rename subst t2)
 rename subst (TSum t1 t2) = TSum (rename subst t1) (rename subst t2)
 rename subst (TList t) = TList (rename subst t)
 rename (x, y) (TVar a) = if x == a then TVar y else TVar a
+
+-- find all free type variables in a type
+freeTypeVars :: Type -> [String]
+freeTypeVars (TVar a) = [a]
+freeTypeVars TUnit = []
+freeTypeVars TInt = []
+freeTypeVars TBool = []
+freeTypeVars (TArrow t1 t2) = freeTypeVars t1 ++ freeTypeVars t2
+freeTypeVars (TProd t1 t2) = freeTypeVars t1 ++ freeTypeVars t2
+freeTypeVars (TSum t1 t2) = freeTypeVars t1 ++ freeTypeVars t2
+freeTypeVars (TList t) = freeTypeVars t
 
 -- Check if a type variable occurs free in a type
 occursFreeType :: String -> Type -> Bool
