@@ -95,7 +95,7 @@ inferType ctx (Abs pos x xt rt e) = do
   (rt', c) <- inferType ctx' e
   case rt of
     Nothing -> return (TArrow xt' rt', c)
-    Just rt'' -> return (TArrow xt' rt'', (rt', rt'', pos):c)
+    Just rt'' -> return (TArrow xt' rt', (rt', rt'', pos):c)
 
 inferType ctx (App pos e1 e2) = do
   

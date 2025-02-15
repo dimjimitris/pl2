@@ -76,6 +76,36 @@ inferType _ (NumLit _ _) = return (TInt, [])
 inferType _ (BoolLit _ _) = return (TBool, [])
 
 -- rest of cases...
+inferType ctx (Var pos x) = case M.lookup x ctx of
+  Nothing -> lift $ typeError pos $ "Unbound variable " <> x
+  Just scheme -> do
+    t <- instantiate scheme
+    return (t, [])
+
+-- (fun (x : xt) : rt -> e) rt will always be missing in the AST
+-- based on my understanding of the code
+inferType ctx (Abs pos x xt rt e) = do
+  a <- freshTVar
+  let xt' = Data.Maybe.fromMaybe (TVar a) xt
+  let ctx' = M.insert x (Type xt') ctx
+  (rt', c) <- inferType ctx' e
+  case rt of
+    Nothing -> return (TArrow xt' rt', c)
+    Just rt'' -> return (TArrow xt' rt', (rt', rt'', pos):c)
+
+inferType ctx (App pos e1 e2) = do
+  (t1, c1) <- inferType ctx e1
+  (t2, c2) <- inferType ctx e2
+  a <- freshTVar
+  return (TVar a, (t1, TArrow t2 (TVar a), pos):c1 ++ c2)
+
+inferType ctx (ITE pos e1 e2 e3) = do
+  (t1, c1) <- inferType ctx e1
+  (t2, c2) <- inferType ctx e2
+  (t3, c3) <- inferType ctx e3
+  return (t2, (t1, TBool, pos):(t2, t3, pos):c1 ++ c2 ++ c3)
+
+
 
 -- Top-level type inference function with an empty context
 inferTypeTop :: Exp -> Error TypeScheme
