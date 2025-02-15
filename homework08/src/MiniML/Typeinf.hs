@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module MiniML.Typeinf where
 
 import qualified Data.Map as M
@@ -10,7 +9,7 @@ import MiniML.Error
 import MiniML.Print -- For better error messages
 import Debug.Trace -- Debug.Trace is your friend
 
-import Data.Maybe
+import Data.Maybe (fromMaybe)
 
 -- A Typing context
 type Ctx = M.Map String TypeScheme
@@ -43,17 +42,16 @@ freshTVar = do
 typeError :: Posn -> String -> Error a
 typeError p msg = Left (p, msg)
 
+
 -- Constraint unification
 unify :: Constraints -> Error Substitution
 unify [] = return M.empty
-unify ((t1, t2, pos): c) = case (t1, t2) of
+unify ((t1, t2, pos):c) = case (t1, t2) of
   -- cases described in README.md
   (TVar a, TVar b) | a == b -> unify c
   (TVar a, t) | not $ occursFreeType a t -> do
-    let subst = M.singleton a t
-    let c' = applySubstCnstr c subst
-    s <- unify c'
-    return $ composeSubst s subst
+    s <- unify $ applySubstCnstr c $ M.singleton a t
+    return $ extendSubst s a t
   (t, TVar a) -> unify $ (TVar a, t, pos):c -- just flip it, the previous case will handle it
   (TArrow t11 t12, TArrow t21 t22) ->
     unify $ (t11, t21, pos):(t12, t22, pos):c
@@ -71,38 +69,7 @@ unify ((t1, t2, pos): c) = case (t1, t2) of
 
 -- Constraint and type generation
 inferType :: Ctx -> Exp -> TypeInf (Type, Constraints)
-
--- literals
-inferType _ (Unit _) = return (TUnit, [])
-inferType _ (NumLit _ _) = return (TInt, [])
-inferType _ (BoolLit _ _) = return (TBool, [])
-
--- rest of the cases...
-
-inferType ctx (Var pos x) = 
-  case M.lookup x ctx of
-    Nothing -> lift $ typeError pos $ "Unbound variable " <> x
-    Just ty -> do
-      t <- instantiate ty
-      return (t, [])
-
--- (fun (x : xt) -> e)
-inferType ctx (Abs pos x xt rt e) = case (xt, rt) of
-  (Nothing, Nothing) -> do
-    a <- freshTVar
-    let xt' = TVar a
-        ctx' = M.delete x ctx
-        ctx'' = ctx' `M.union` M.singleton x (Type $ xt')
-    (t, c) <- inferType ctx'' e
-    -- apply all constraints to the type. Constraints is a list of substitutions
-    return (TArrow xt' t, c)
-
-
-
-
-inferType _ _ = error "Implement me!"
-  
-
+inferType = error "Implement me!"
 
 -- Top-level type inference function with an empty context
 inferTypeTop :: Exp -> Error TypeScheme
@@ -137,37 +104,37 @@ applySubstTypeScheme (Forall xs t) subst = Forall xs $ applySubst t (foldr M.del
 applySubstEnv :: Ctx -> Substitution -> Ctx
 applySubstEnv ctx subst = M.map (`applySubstTypeScheme` subst) ctx
 
--- compose two substitutions (e.g. s1 . s2 (t) = s1(s2(t)))
-composeSubst :: Substitution -> Substitution -> Substitution
-composeSubst s1 s2 = M.map (`applySubst` s1) s2 `M.union` s1
 
 -- Extend a substitution. Essentially the composition of a substitution subst
 -- with a singleton substitution [x -> typ].
 extendSubst :: Substitution -> String -> Type -> Substitution
-extendSubst subst x typ = composeSubst subst $ M.singleton x typ
+extendSubst s x typ = M.map (`applySubst` s) (M.singleton x typ) `M.union` s
 
 -- Instantiate universal type variables with fresh ones
 instantiate :: TypeScheme -> TypeInf Type
 instantiate (Type t) = return t
-instantiate (Forall xs t) = do
-  freshVars <- mapM (const freshTVar) xs
-  let s = M.fromList $ zip xs (TVar <$> freshVars)
-  return $ applySubst t s
+instantiate (Forall vars t) = do
+  freshVars <- mapM (const freshTVar) vars
+  let subst = M.fromList $ zip vars (map TVar freshVars)
+  return $ applySubst t subst
 
 -- Generalize a the free type variables in a type
--- need to implement a function that collects free type variables
--- so we can find the free variables in `t` but not in `ctx`.
 generalize :: Ctx -> Type -> TypeScheme
 generalize ctx t =
-  let freeVars = nub $ freeTypeVars t
-      ctxVars = nub $ concatMap freeTypeVars $ filterTypeScheme $ M.elems ctx
-      vars = filter (`notElem` ctxVars) freeVars
+  let vars = nub [v | v <- freeTypeVars t, not $ occursFreeCtx v ctx]
   in Forall vars t
   where
-    filterTypeScheme :: [TypeScheme] -> [Type]
-    filterTypeScheme = mapMaybe $ \case
-      Type t' -> Just t'
-      _ -> Nothing
+    freeTypeVars :: Type -> [String]
+    freeTypeVars (TVar a) = [a]
+    freeTypeVars TUnit = []
+    freeTypeVars TInt = []
+    freeTypeVars TBool = []
+    freeTypeVars (TSum t1 t2) = freeTypeVars t1 ++ freeTypeVars t2
+    freeTypeVars (TProd t1 t2) = freeTypeVars t1 ++ freeTypeVars t2
+    freeTypeVars (TArrow t1 t2) = freeTypeVars t1 ++ freeTypeVars t2
+    freeTypeVars (TList t') = freeTypeVars t'
+
+
 
 -- Rename a free type variable in a type
 rename :: (String, String) -> Type -> Type
@@ -179,17 +146,6 @@ rename subst (TProd t1 t2) = TProd (rename subst t1) (rename subst t2)
 rename subst (TSum t1 t2) = TSum (rename subst t1) (rename subst t2)
 rename subst (TList t) = TList (rename subst t)
 rename (x, y) (TVar a) = if x == a then TVar y else TVar a
-
--- find all free type variables in a type
-freeTypeVars :: Type -> [String]
-freeTypeVars (TVar a) = [a]
-freeTypeVars TUnit = []
-freeTypeVars TInt = []
-freeTypeVars TBool = []
-freeTypeVars (TArrow t1 t2) = freeTypeVars t1 ++ freeTypeVars t2
-freeTypeVars (TProd t1 t2) = freeTypeVars t1 ++ freeTypeVars t2
-freeTypeVars (TSum t1 t2) = freeTypeVars t1 ++ freeTypeVars t2
-freeTypeVars (TList t) = freeTypeVars t
 
 -- Check if a type variable occurs free in a type
 occursFreeType :: String -> Type -> Bool
