@@ -69,7 +69,13 @@ unify ((t1, t2, pos):c) = case (t1, t2) of
 
 -- Constraint and type generation
 inferType :: Ctx -> Exp -> TypeInf (Type, Constraints)
-inferType = error "Implement me!"
+
+-- literals
+inferType _ (Unit _) = return (TUnit, [])
+inferType _ (NumLit _ _) = return (TInt, [])
+inferType _ (BoolLit _ _) = return (TBool, [])
+
+-- rest of cases...
 
 -- Top-level type inference function with an empty context
 inferTypeTop :: Exp -> Error TypeScheme
