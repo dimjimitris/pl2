@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module MiniML.Typeinf where
 
 import qualified Data.Map as M
@@ -8,6 +9,8 @@ import MiniML.Syntax
 import MiniML.Error
 import MiniML.Print -- For better error messages
 import Debug.Trace -- Debug.Trace is your friend
+
+import Data.Maybe
 
 -- A Typing context
 type Ctx = M.Map String TypeScheme
@@ -68,7 +71,37 @@ unify ((t1, t2, pos): c) = case (t1, t2) of
 
 -- Constraint and type generation
 inferType :: Ctx -> Exp -> TypeInf (Type, Constraints)
-inferType = error "Implement me!"
+
+-- literals
+inferType _ (Unit _) = return (TUnit, [])
+inferType _ (NumLit _ _) = return (TInt, [])
+inferType _ (BoolLit _ _) = return (TBool, [])
+
+-- rest of the cases...
+
+inferType ctx (Var pos x) = 
+  case M.lookup x ctx of
+    Nothing -> lift $ typeError pos $ "Unbound variable " <> x
+    Just ty -> do
+      t <- instantiate ty
+      return (t, [])
+
+-- (fun (x : xt) -> e)
+inferType ctx (Abs pos x xt rt e) = case (xt, rt) of
+  (Nothing, Nothing) -> do
+    a <- freshTVar
+    let xt' = TVar a
+        ctx' = M.delete x ctx
+        ctx'' = ctx' `M.union` M.singleton x (Type $ xt')
+    (t, c) <- inferType ctx'' e
+    -- apply all constraints to the type. Constraints is a list of substitutions
+    return (TArrow xt' t, c)
+
+
+
+
+inferType _ _ = error "Implement me!"
+  
 
 
 -- Top-level type inference function with an empty context
@@ -127,9 +160,14 @@ instantiate (Forall xs t) = do
 generalize :: Ctx -> Type -> TypeScheme
 generalize ctx t =
   let freeVars = nub $ freeTypeVars t
-      ctxVars = nub $ concatMap freeTypeVars $ M.elems ctx
+      ctxVars = nub $ concatMap freeTypeVars $ filterTypeScheme $ M.elems ctx
       vars = filter (`notElem` ctxVars) freeVars
   in Forall vars t
+  where
+    filterTypeScheme :: [TypeScheme] -> [Type]
+    filterTypeScheme = mapMaybe $ \case
+      Type t' -> Just t'
+      _ -> Nothing
 
 -- Rename a free type variable in a type
 rename :: (String, String) -> Type -> Type
