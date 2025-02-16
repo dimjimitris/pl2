@@ -1,14 +1,8 @@
-#![allow(dead_code)]
-use std::env;
-use std::fs;
+use std::{env, fs};
 
 mod bytecode;
-use bytecode::Bytecode;
-
-mod vm;
-use vm::VM;
-
 mod heap;
+mod vm;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -17,9 +11,10 @@ fn main() {
 
     let raw_bytes = fs::read(file_path).expect("Unable to read the file.");
 
-    let bytecode = Bytecode::from_raw_bytes(&raw_bytes);
+    let bytecode = bytecode::Bytecode::from_raw_bytes(&raw_bytes);
 
-    let mut vm = VM::new(bytecode);
+    //let mut vm = VM::<heap::SimpleHeap>::new(bytecode);
+    let mut vm = vm::VM::<heap::CheneyHeap>::new(bytecode);
 
     vm.run();
 }

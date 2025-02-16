@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections;
 
 #[repr(u8)] // Store enum as a single byte
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,23 +74,50 @@ impl Opcode {
 
 pub struct Bytecode {
     pub instructions: Vec<u8>,
+    ip: usize,
 }
 
 impl Bytecode {
     /// Parse raw bytes into a Bytecode object
     pub fn from_raw_bytes(raw_bytes: &[u8]) -> Self {
-        Bytecode {
+        Self {
             instructions: raw_bytes.to_vec(),
+            ip: 0,
         }
     }
 
+    /// Get the next N bytes of the bytecode and increment the instruction pointer
+    pub fn next_bytes<const N: usize>(&mut self) -> [u8; N] {
+        if self.ip + N > self.instructions.len() {
+            panic!("not enough bytes left")
+        }
+
+        let bytes = &self.instructions[self.ip..self.ip + N];
+        self.ip += N;
+
+        bytes.try_into().unwrap()
+    }
+
+    pub fn jump(&mut self, instr_addr: u16) {
+        if instr_addr as usize > self.instructions.len() {
+            panic!("invalid jump address")
+        }
+
+        self.ip = instr_addr as usize;
+    }
+
+    pub fn ip(&self) -> u16 {
+        self.ip as u16
+    }
+
     /// Disassemble the bytecode into a human-readable format
+    #[allow(dead_code)]
     pub fn disassemble(&self) -> Result<String, String> {
         let instrs = &self.instructions;
         let mut program = String::from("");
 
         // Add labels to the addresses that are jumped too
-        let mut labels = HashMap::new();
+        let mut labels = collections::HashMap::new();
 
         let mut i = 0;
         let mut cnt = 0;
@@ -145,7 +172,7 @@ impl Bytecode {
             // instruction to be printed at the beginning of each line. May be
             // useful for debugging purposes.
 
-            // program.push_str(&format!("0x{:X}: ", i));
+            program.push_str(&format!("{:#04x}: ", i));
 
             i += 1;
 
@@ -196,7 +223,7 @@ impl Bytecode {
                     i += 2;
                 }
                 Some(Opcode::Push1) => {
-                    let lit = instrs[i] as u8;
+                    let lit = instrs[i];
                     program.push_str(&format!("Push1 {lit}\n"));
                     i += 1;
                 }
@@ -229,6 +256,6 @@ impl Bytecode {
                 None => return Err(format!("Invalid opcode at addr {}", i - 1)),
             }
         }
-        return Ok(program);
+        Ok(program)
     }
 }
