@@ -1,1 +1,27 @@
-dist-newstyle/*
+# Cabal build files
+dist-newstyle/
+dist/
+cabal.project.local
+cabal.project.local~ 
+cabal.sandbox.config
+*.buildinfo
+*.cabal~
+
+# Haskell binaries
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+*.prof
+*.aux
+*.hp
+*.eventlog
+
+# Stack build files
+.stack-work/
+
+# Haskell IDE files
+.ghc.environment.*
+.ghci_history
+.ghc/
+.tags
