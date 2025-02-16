@@ -85,23 +85,40 @@ inferType ctx (Var pos x) = case M.lookup x ctx of
 -- (fun (x : xt) : rt -> e) rt will always be missing in the AST
 -- based on my understanding of the code
 inferType ctx (Abs pos x xt rt e) = do
+--  a <- freshTVar
+--  let xt' = Data.Maybe.fromMaybe (TVar a) xt
+--  let ctx' = M.insert x (Type xt') ctx
+--  (rt', c) <- inferType ctx' e
+--  case rt of
+--    Nothing -> return (TArrow xt' rt', c)
+--    Just rt'' -> return (TArrow xt' rt', (rt', rt'', pos):c)
   a <- freshTVar
-  let xt' = Data.Maybe.fromMaybe (TVar a) xt
-  let ctx' = M.insert x (Type xt') ctx
-  (rt', c) <- inferType ctx' e
+  let xt' = fromMaybe (TVar a) xt
+  let xtv = Type xt'
+  let ctx' = M.delete x ctx
+  let ctx'' = ctx' `M.union` M.singleton x xtv
+  (rt', c) <- inferType ctx'' e
+  subst <- lift $ unify c
+  let xt'' = applySubst xt' subst
   case rt of
-    Nothing -> return (TArrow xt' rt', c)
-    Just rt'' -> return (TArrow xt' rt', (rt', rt'', pos):c)
+    Nothing -> return (TArrow xt'' rt', c)
+    Just rt'' -> return (TArrow xt'' rt', (rt', rt'', pos):c)
 
 inferType ctx (App pos e1 e2) = do
   (t1, c1) <- inferType ctx e1
-  (t2, c2) <- inferType ctx e2
+  s1 <- lift $ unify c1
+  let ctx' = applySubstEnv ctx s1
+  (t2, c2) <- inferType ctx' e2
+  s2 <- lift $ unify c2
+
   a <- freshTVar
---  let cnstrs = [(t1, TArrow t2 (TVar a), pos)]
---  case unify $ cnstrs ++ c1 ++ c2 of
---    Left _ -> lift $ typeError pos $ "Cannot unify " <> showType t1 <> " with " <> showType (TArrow t2 (TVar a))
---    Right s -> return (applySubst (TVar a) s, applySubstCnstr cnstrs s ++ applySubstCnstr c1 s ++ applySubstCnstr c2 s)
-  return (TVar a, (t1, TArrow t2 (TVar a), pos):c1 ++ c2)
+  let t' = TVar a
+  let s3' = applySubst t1 s2
+  let t'' = TArrow t2 t'
+  let cnstr = [(s3', t'', pos)]
+--  return (t', cnstr ++ applySubstCnstr c1 s2)
+  return (t', cnstr ++ c1 ++ c2)
+  
 
 inferType ctx (ITE pos e1 e2 e3) = do
   (t1, c1) <- inferType ctx e1
@@ -194,27 +211,36 @@ inferType ctx (Case pos e1 x1 e2 x2 e3) = do
   let constraints = [(t1, TSum a1 a2, pos), (t2, t3, pos)]
   return (t2, constraints ++ c1 ++ c2 ++ c3)
 
--- let x : mt = e1 in e2 (same as (fun x : mt -> e2) e1)
+-- let x : mt = e1 in e2 (not exactly the same as (fun x : mt -> e2) e1)
 -- this implementation is subject to change!
--- inferType ctx (Let pos x mt e1 e2) = inferType ctx (App pos (Abs pos x mt Nothing e2) e1)
 inferType ctx (Let pos x mt e1 e2) = do
   (t1, c1) <- inferType ctx e1
-  let ctx' = M.delete x ctx
-  let t' = case mt of
-        Nothing -> generalize ctx t1
-        Just mt' -> if occursFreeCtx x ctx then generalize ctx t1 else Type mt'
-  let ctx'' = M.insert x t' ctx'
-  (t2, c2) <- inferType ctx'' e2
   let cnstrs = case mt of
         Nothing -> []
         Just mt' -> [(t1, mt', pos)]
-  return (t2, cnstrs ++ c1 ++ c2)
+  let c1' = cnstrs ++ c1
+  let ctx' = M.delete x ctx
+  s1 <- lift $ unify c1'
+  let ctx'' = applySubstEnv ctx' s1
+  let t' = generalize ctx'' t1
+  let ctx''' = M.insert x t' ctx''
+  let ctx'''' = applySubstEnv ctx''' s1
+  (t2, c2) <- inferType ctx'''' e2
+
+  return (t2, c1' ++ c2)
 
 inferType ctx (LetRec pos f x mtx mtr e1 e2) = do
   a <- freshTVar
   b <- freshTVar
-  let ctx' = M.insert f (Forall [a, b] $ TArrow (TVar a) (TVar b)) ctx
-  inferType ctx' (Let pos f (Just $ TArrow (TVar a) (TVar b)) (Abs pos x mtx mtr e1) e2)
+  let ctx' = M.delete f ctx
+  let ctx'' = M.insert f (Type $ TArrow (TVar a) (TVar b)) ctx'
+  (t,c) <- inferType ctx'' (Let pos f (Just $ TArrow (TVar a) (TVar b)) (Abs pos x (Just $ TVar a) (Just $ TVar b) e1) e2)
+  case (mtx, mtr) of
+    (Nothing, Nothing) -> return (t, c)
+    (Just tx, Just tr) -> return (t, (TArrow (TVar a) (TVar b), TArrow tx tr, pos):c)
+    (Just tx, Nothing) -> return (t, (TVar a, tx, pos):c)
+    (Nothing, Just tr) -> return (t, (TVar b, tr, pos):c)
+  
 
 -- Top-level type inference function with an empty context
 inferTypeTop :: Exp -> Error TypeScheme
@@ -253,7 +279,6 @@ applySubstTypeScheme (Forall xs t) subst = Forall xs $ applySubst t (foldr M.del
 -- Apply a substitution to a typing environment
 applySubstEnv :: Ctx -> Substitution -> Ctx
 applySubstEnv ctx subst = M.map (`applySubstTypeScheme` subst) ctx
-
 
 -- Extend a substitution. Essentially the composition of a substitution subst
 -- with a singleton substitution [x -> typ].
