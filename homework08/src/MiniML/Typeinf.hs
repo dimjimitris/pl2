@@ -97,6 +97,10 @@ inferType ctx (App pos e1 e2) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
   a <- freshTVar
+--  let cnstrs = [(t1, TArrow t2 (TVar a), pos)]
+--  case unify $ cnstrs ++ c1 ++ c2 of
+--    Left _ -> lift $ typeError pos $ "Cannot unify " <> showType t1 <> " with " <> showType (TArrow t2 (TVar a))
+--    Right s -> return (applySubst (TVar a) s, applySubstCnstr cnstrs s ++ applySubstCnstr c1 s ++ applySubstCnstr c2 s)
   return (TVar a, (t1, TArrow t2 (TVar a), pos):c1 ++ c2)
 
 inferType ctx (ITE pos e1 e2 e3) = do
@@ -193,7 +197,7 @@ inferType ctx (Case pos e1 x1 e2 x2 e3) = do
 -- let x : mt = e1 in e2 (same as (fun x : mt -> e2) e1)
 -- this implementation is subject to change!
 -- inferType ctx (Let pos x mt e1 e2) = inferType ctx (App pos (Abs pos x mt Nothing e2) e1)
-inferType ctx (Let _ x mt e1 e2) = do
+inferType ctx (Let pos x mt e1 e2) = do
   (t1, c1) <- inferType ctx e1
   let ctx' = M.delete x ctx
   let t' = case mt of
@@ -201,7 +205,10 @@ inferType ctx (Let _ x mt e1 e2) = do
         Just mt' -> if occursFreeCtx x ctx then generalize ctx t1 else Type mt'
   let ctx'' = M.insert x t' ctx'
   (t2, c2) <- inferType ctx'' e2
-  return (t2, c1 ++ c2)
+  let cnstrs = case mt of
+        Nothing -> []
+        Just mt' -> [(t1, mt', pos)]
+  return (t2, cnstrs ++ c1 ++ c2)
 
 inferType ctx (LetRec pos f x mtx mtr e1 e2) = do
   a <- freshTVar
