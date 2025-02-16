@@ -105,11 +105,118 @@ inferType ctx (ITE pos e1 e2 e3) = do
   (t3, c3) <- inferType ctx e3
   return (t2, (t1, TBool, pos):(t2, t3, pos):c1 ++ c2 ++ c3)
 
+inferType ctx (Bop pos op e1 e2) = do
+  (t1, c1) <- inferType ctx e1
+  (t2, c2) <- inferType ctx e2
+  let (rett, constraints) = case op of
+        Plus -> (TInt, [(t1, TInt, pos), (t2, TInt, pos)])
+        Minus -> (TInt, [(t1, TInt, pos), (t2, TInt, pos)])
+        Mult -> (TInt, [(t1, TInt, pos), (t2, TInt, pos)])
+        Div -> (TInt, [(t1, TInt, pos), (t2, TInt, pos)])
+        And -> (TBool, [(t1, TBool, pos), (t2, TBool, pos)])
+        Or -> (TBool, [(t1, TBool, pos), (t2, TBool, pos)])
+        Lt -> (TBool, [(t1, TInt, pos), (t2, TInt, pos)])
+        Gt -> (TBool, [(t1, TInt, pos), (t2, TInt, pos)])
+        Le -> (TBool, [(t1, TInt, pos), (t2, TInt, pos)])
+        Ge -> (TBool, [(t1, TInt, pos), (t2, TInt, pos)])
+        Eq -> (TBool, [(t1, t2, pos)])
+  return (rett, constraints ++ c1 ++ c2)
 
+inferType ctx (Uop pos op e) = do
+  (t, c) <- inferType ctx e
+  let (rett, constraints) = case op of
+        Not -> (TBool, [(t, TBool, pos)])
+  return (rett, constraints ++ c)
+
+inferType ctx (Pair _ e1 e2) = do
+  (t1, c1) <- inferType ctx e1
+  (t2, c2) <- inferType ctx e2
+  return (TProd t1 t2, c1 ++ c2)
+
+inferType ctx (Fst pos e) = do
+  (t, c) <- inferType ctx e
+  a1 <- freshTVar
+  a2 <- freshTVar
+  let constraints = [(t, TProd (TVar a1) (TVar a2), pos)]
+  return (TVar a1, constraints ++ c)
+
+inferType ctx (Snd pos e) = do
+  (t, c) <- inferType ctx e
+  a1 <- freshTVar
+  a2 <- freshTVar
+  let constraints = [(t, TProd (TVar a1) (TVar a2), pos)]
+  return (TVar a2, constraints ++ c)
+
+inferType _ (Nil _) = do
+  a <- freshTVar
+  return (TList (TVar a), [])
+
+inferType ctx (Cons pos e1 e2) = do
+  (t1, c1) <- inferType ctx e1
+  (t2, c2) <- inferType ctx e2
+  let constraints = [(t2, TList t1, pos)]
+  return (TList t1, constraints ++ c1 ++ c2)
+
+-- case e1 of | [] -> e2 | hd::tl -> e3
+inferType ctx (CaseL pos e1 e2 hd tl e3) = do
+  (t1, c1) <- inferType ctx e1
+  a <- freshTVar
+  let ctx' = M.insert hd (Type $ TVar a) $ M.insert tl (Type $ TList $ TVar a) ctx
+  (t2, c2) <- inferType ctx e2
+  (t3, c3) <- inferType ctx' e3
+  let constraints = [(t1, TList $ TVar a, pos), (t2, t3, pos)]
+  return (t2, constraints ++ c1 ++ c2 ++ c3)
+
+inferType ctx (Inl _ e) = do
+  (t, c) <- inferType ctx e
+  a <- freshTVar
+  return (TSum t (TVar a), c)
+
+inferType ctx (Inr _ e) = do
+  (t, c) <- inferType ctx e
+  a <- freshTVar
+  return (TSum (TVar a) t, c)
+
+-- case e1 of | Inl x1 -> e2 | Inr x2 -> e3
+inferType ctx (Case pos e1 x1 e2 x2 e3) = do
+  (t1, c1) <- inferType ctx e1
+  a1' <- freshTVar
+  a2' <- freshTVar
+  let (a1, a2) = (TVar a1', TVar a2')
+  let ctxl = M.insert x1 (Type a1) ctx
+  let ctxr = M.insert x2 (Type a2) ctx
+  (t2, c2) <- inferType ctxl e2
+  (t3, c3) <- inferType ctxr e3
+  let constraints = [(t1, TSum a1 a2, pos), (t2, t3, pos)]
+  return (t2, constraints ++ c1 ++ c2 ++ c3)
+
+-- let x : mt = e1 in e2 (same as (fun x : mt -> e2) e1)
+-- this implementation is subject to change!
+-- inferType ctx (Let pos x mt e1 e2) = inferType ctx (App pos (Abs pos x mt Nothing e2) e1)
+inferType ctx (Let _ x mt e1 e2) = do
+  (t1, c1) <- inferType ctx e1
+  let ctx' = M.delete x ctx
+  let t' = case mt of
+        Nothing -> generalize ctx t1
+        Just mt' -> if occursFreeCtx x ctx then generalize ctx t1 else Type mt'
+  let ctx'' = M.insert x t' ctx'
+  (t2, c2) <- inferType ctx'' e2
+  return (t2, c1 ++ c2)
+
+inferType ctx (LetRec pos f x mtx mtr e1 e2) = do
+  a <- freshTVar
+  b <- freshTVar
+  let ctx' = M.insert f (Forall [a, b] $ TArrow (TVar a) (TVar b)) ctx
+  inferType ctx' (Let pos f (Just $ TArrow (TVar a) (TVar b)) (Abs pos x mtx mtr e1) e2)
 
 -- Top-level type inference function with an empty context
 inferTypeTop :: Exp -> Error TypeScheme
-inferTypeTop = error "Implement me!"
+inferTypeTop exp' = do
+  case runStateT (inferType M.empty exp') (MkTIState 0) of
+    Left err -> Left err
+    Right ((t, c), _) -> do
+      s <- unify c
+      return $ generalize M.empty $ applySubst t s
 
 -- Various helper functions
 
