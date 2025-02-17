@@ -190,7 +190,7 @@ impl<H: heap::Heap> VM<H> {
 
                         // run_gc() panics if the heap does not have enough space
                         // so the loop {} will terminate after at most two iterations
-                        self.heap.run_gc(&mut self.stack);
+                        self.heap.run_gc(&mut self.stack[..self.sp]);
                     }
                 }
 
