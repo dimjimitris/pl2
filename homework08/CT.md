@@ -79,12 +79,12 @@ unify(C) = case C of
 ( adapted from 'Types and Programming' by Benjamin C. Pierce : Chapter 22.7 Let-Polymorphism )
 
 
-      Γ, Γ' ⊢ let f = (fun x -> e1) in f : α | C1           Γ, Γ'' ⊢ e2 : t2 | C2
-----------------------------------------------------------------------------------------------CT-LetRec         α is fresh
-                Γ ⊢ let rec f x = e1 in e2 : t2 | { t1 = α } ∪ C1 ∪ C2
-
-               where Γ' = f : α, Γ'' = f : Γ^-(t1) Γ^-(τ) = generalize Γ τ    
+   Γ, f : α ⊢ let f = (fun x -> e1) in f : t1 | C1         Γ, f : Γ^-(t1) ⊢ e2 : t2 | C2
+-------------------------------------------------------------------------------------------CT-LetRec   α is fresh, Γ^-(τ) = generalize Γ τ
+                    Γ ⊢ let rec f x = e1 in e2 : t2 | { t1 = α } ∪ C1 ∪ C2   
 ( adapted from https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system#Typing_rule )
+
+
 
 Γ refers to context (type Ctx in code)
 ```
