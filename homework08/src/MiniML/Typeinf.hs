@@ -208,15 +208,13 @@ inferType ctx (Let pos x mt e1 e2) = do
 inferType ctx (LetRec pos f x mtx mtr e1Aux e2) = do
   let e1 = Abs pos x mtx mtr e1Aux
   aAux <- freshTVar; let a = TVar aAux
-  let ctx'Aux = M.insert f (Type a) ctx
-  let ctx' = ctx `M.union` ctx'Aux
+  let ctx' = M.insert f (Type a) ctx
   (t1Aux, c1) <- inferType ctx' e1
   s1 <- lift $ unify c1
   let t1 = applySubst t1Aux s1
   let ctx'' = applySubstEnv ctx s1
   let ts1 = generalize ctx'' t1
-  let ctx'''Aux = M.insert f ts1 ctx
-  let ctx''' = ctx `M.union` ctx'''Aux
+  let ctx''' = M.insert f ts1 ctx
   (t2, c2) <- inferType ctx''' e2
   return (t2, nub ([(t1, a, pos)] ++ c1 ++ c2))
 
