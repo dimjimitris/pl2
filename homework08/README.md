@@ -119,7 +119,7 @@ extended is a mostly straight forward way to handle all constructs of MiniML.
 
       Γ ⊢ e1 : t1 | C1       Γ, x : α ⊢ e2 : t2 | C2       Γ, y : β ⊢ e3 : t3 | C3
 -------------------------------------------------------------------------------------------CT-Case             α, β are fresh
-    Γ ⊢ case e1 of | inl x -> e2  | inr y -> e3 : t2 {t1 = α + β, t2 = t3}  ∪ C1 ∪ C2 ∪ C3
+    Γ ⊢ case e1 of | inl x -> e2  | inr y -> e3 : t2 {t1 = α + β, t2 = t3} ∪ C1 ∪ C2 ∪ C3
 
 
       Γ ⊢ [x ↦ e1]e2 : t2 | C2        Γ ⊢ e1 : t1 | C1
