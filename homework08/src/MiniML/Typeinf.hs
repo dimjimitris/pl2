@@ -82,16 +82,16 @@ inferType ctx (Var pos x) = case M.lookup x ctx of
     t <- instantiate scheme
     return (t, [])
 
--- (fun (x : t1) : t2 -> e) rt will always be missing in the AST
+-- (fun (x : t1) : t2 -> e) t2 will always be missing in the AST
 -- based on my understanding of the code
 inferType ctx (Abs pos x mt1 mt2 e) = do
   aAux <- freshTVar; let t1 = Data.Maybe.fromMaybe (TVar aAux) mt1
   let ctx' = M.insert x (Type t1) ctx
-  (t2Aux, c2Aux) <- inferType ctx' e
+  (t2, c2Aux) <- inferType ctx' e
   let c2 = case mt2 of
         Nothing -> c2Aux
-        Just t2 -> [(t2Aux, t2, pos)] ++ c2Aux
-  return (TArrow t1 t2Aux, c2)
+        Just t2Aux -> [(t2, t2Aux, pos)] ++ c2Aux
+  return (TArrow t1 t2, c2)
 
 inferType ctx (App pos e1 e2) = do
   (t1, c1) <- inferType ctx e1
@@ -187,8 +187,7 @@ inferType ctx (Case pos e1 x e2 y e3) = do
   (t3, c3) <- inferType ctx'' e3
   return (t2, nub ([(t1, TSum a b, pos), (t2, t3, pos)] ++ c1 ++ c2 ++ c3))
 
--- let x : t = e1 in e2 (not exactly the same as (fun x : t -> e2) e1)
--- this implementation is subject to change!
+
 inferType ctx (Let pos x mt e1 e2) = do
   (t1Aux, c1Aux) <- inferType ctx e1
   let c1 = case mt of
@@ -205,6 +204,7 @@ inferType ctx (Let pos x mt e1 e2) = do
 -- let rec f (x : mtx) : mtr = e1Aux in e2
 -- e1 = (fun x : mtx -> e1Aux)
 -- t1 = TArrow tx tr
+-- model it as let f = e1 in e2
 inferType ctx (LetRec pos f x mtx mtr e1Aux e2) = do
   let e1 = Abs pos x mtx mtr e1Aux
   aAux <- freshTVar; let a = TVar aAux
