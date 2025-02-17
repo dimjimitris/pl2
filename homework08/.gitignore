@@ -1,6 +1,6 @@
 # Cabal build files
-dist-newstyle/
-dist/
+dist-newstyle/*
+dist/*
 cabal.project.local
 cabal.project.local~ 
 cabal.sandbox.config

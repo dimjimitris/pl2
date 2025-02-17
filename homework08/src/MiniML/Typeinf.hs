@@ -7,7 +7,7 @@ import Data.List (nub) -- nub removes duplicates from a list. You may find it he
 import MiniML.Syntax
 import MiniML.Error
 import MiniML.Print -- For better error messages
-import Debug.Trace -- Debug.Trace is your friend
+-- import Debug.Trace -- Debug.Trace is your friend
 
 import Data.Maybe (fromMaybe)
 
@@ -82,54 +82,33 @@ inferType ctx (Var pos x) = case M.lookup x ctx of
     t <- instantiate scheme
     return (t, [])
 
--- (fun (x : xt) : rt -> e) rt will always be missing in the AST
+-- (fun (x : t1) : t2 -> e) rt will always be missing in the AST
 -- based on my understanding of the code
-inferType ctx (Abs pos x xt rt e) = do
---  a <- freshTVar
---  let xt' = Data.Maybe.fromMaybe (TVar a) xt
---  let ctx' = M.insert x (Type xt') ctx
---  (rt', c) <- inferType ctx' e
---  case rt of
---    Nothing -> return (TArrow xt' rt', c)
---    Just rt'' -> return (TArrow xt' rt', (rt', rt'', pos):c)
-  a <- freshTVar
-  let xt' = fromMaybe (TVar a) xt
-  let xtv = Type xt'
-  let ctx' = M.delete x ctx
-  let ctx'' = ctx' `M.union` M.singleton x xtv
-  (rt', c) <- inferType ctx'' e
-  subst <- lift $ unify c
-  let xt'' = applySubst xt' subst
-  case rt of
-    Nothing -> return (TArrow xt'' rt', c)
-    Just rt'' -> return (TArrow xt'' rt', (rt', rt'', pos):c)
+inferType ctx (Abs pos x mt1 mt2 e) = do
+  aAux <- freshTVar; let t1 = Data.Maybe.fromMaybe (TVar aAux) mt1
+  let ctx' = M.insert x (Type t1) ctx
+  (t2Aux, c2Aux) <- inferType ctx' e
+  let c2 = case mt2 of
+        Nothing -> c2Aux
+        Just t2 -> [(t2Aux, t2, pos)] ++ c2Aux
+  return (TArrow t1 t2Aux, c2)
 
 inferType ctx (App pos e1 e2) = do
   (t1, c1) <- inferType ctx e1
-  s1 <- lift $ unify c1
-  let ctx' = applySubstEnv ctx s1
-  (t2, c2) <- inferType ctx' e2
-  s2 <- lift $ unify c2
-
-  a <- freshTVar
-  let t' = TVar a
-  let s3' = applySubst t1 s2
-  let t'' = TArrow t2 t'
-  let cnstr = [(s3', t'', pos)]
---  return (t', cnstr ++ applySubstCnstr c1 s2)
-  return (t', cnstr ++ c1 ++ c2)
-  
+  (t2, c2) <- inferType ctx e2
+  aAux <- freshTVar; let a = TVar aAux
+  return (a, nub ([(t1, TArrow t2 a, pos)] ++ c1 ++ c2))
 
 inferType ctx (ITE pos e1 e2 e3) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
   (t3, c3) <- inferType ctx e3
-  return (t2, (t1, TBool, pos):(t2, t3, pos):c1 ++ c2 ++ c3)
+  return (t2, nub ([(t1, TBool, pos), (t2, t3, pos)] ++ c1 ++ c2 ++ c3))
 
 inferType ctx (Bop pos op e1 e2) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
-  let (rett, constraints) = case op of
+  let (rett, c0) = case op of
         Plus -> (TInt, [(t1, TInt, pos), (t2, TInt, pos)])
         Minus -> (TInt, [(t1, TInt, pos), (t2, TInt, pos)])
         Mult -> (TInt, [(t1, TInt, pos), (t2, TInt, pos)])
@@ -141,106 +120,106 @@ inferType ctx (Bop pos op e1 e2) = do
         Le -> (TBool, [(t1, TInt, pos), (t2, TInt, pos)])
         Ge -> (TBool, [(t1, TInt, pos), (t2, TInt, pos)])
         Eq -> (TBool, [(t1, t2, pos)])
-  return (rett, constraints ++ c1 ++ c2)
+  return (rett, nub (c0 ++ c1 ++ c2))
 
 inferType ctx (Uop pos op e) = do
-  (t, c) <- inferType ctx e
-  let (rett, constraints) = case op of
-        Not -> (TBool, [(t, TBool, pos)])
-  return (rett, constraints ++ c)
+  (t1, c1) <- inferType ctx e
+  let (rett, c0) = case op of
+        Not -> (TBool, [(t1, TBool, pos)])
+  return (rett, nub (c0 ++ c1))
 
 inferType ctx (Pair _ e1 e2) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
-  return (TProd t1 t2, c1 ++ c2)
+  return (TProd t1 t2, nub (c1 ++ c2))
 
 inferType ctx (Fst pos e) = do
   (t, c) <- inferType ctx e
-  a1 <- freshTVar
-  a2 <- freshTVar
-  let constraints = [(t, TProd (TVar a1) (TVar a2), pos)]
-  return (TVar a1, constraints ++ c)
+  aAux <- freshTVar; let a = TVar aAux
+  bAux <- freshTVar; let b = TVar bAux
+  let c0 = [(t, TProd a b, pos)]
+  return (a, nub (c0 ++ c))
 
 inferType ctx (Snd pos e) = do
   (t, c) <- inferType ctx e
-  a1 <- freshTVar
-  a2 <- freshTVar
-  let constraints = [(t, TProd (TVar a1) (TVar a2), pos)]
-  return (TVar a2, constraints ++ c)
+  aAux <- freshTVar; let a = TVar aAux
+  bAux <- freshTVar; let b = TVar bAux
+  let c0 = [(t, TProd a b, pos)]
+  return (b, nub (c0 ++ c))
 
 inferType _ (Nil _) = do
-  a <- freshTVar
-  return (TList (TVar a), [])
+  aAux <- freshTVar; let a = TVar aAux
+  return (TList a, [])
 
 inferType ctx (Cons pos e1 e2) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
-  let constraints = [(t2, TList t1, pos)]
-  return (TList t1, constraints ++ c1 ++ c2)
+  return (TList t1, nub ([(t2, TList t1, pos)] ++ c1 ++ c2))
 
 -- case e1 of | [] -> e2 | hd::tl -> e3
 inferType ctx (CaseL pos e1 e2 hd tl e3) = do
   (t1, c1) <- inferType ctx e1
-  a <- freshTVar
-  let ctx' = M.insert hd (Type $ TVar a) $ M.insert tl (Type $ TList $ TVar a) ctx
   (t2, c2) <- inferType ctx e2
-  (t3, c3) <- inferType ctx' e3
-  let constraints = [(t1, TList $ TVar a, pos), (t2, t3, pos)]
-  return (t2, constraints ++ c1 ++ c2 ++ c3)
+  aAux <- freshTVar; let a = TVar aAux
+  let ctx' = M.insert hd (Type a) ctx
+  let ctx'' = M.insert tl (Type $ TList a) ctx'
+  (t3, c3) <- inferType ctx'' e3
+  return (t2, nub ([(t1, TList a, pos), (t2, t3, pos)] ++ c1 ++ c2 ++ c3))
 
 inferType ctx (Inl _ e) = do
+  aAux <- freshTVar; let a = TVar aAux
   (t, c) <- inferType ctx e
-  a <- freshTVar
-  return (TSum t (TVar a), c)
+  return (TSum t a, c)
 
 inferType ctx (Inr _ e) = do
+  aAux <- freshTVar; let a = TVar aAux
   (t, c) <- inferType ctx e
-  a <- freshTVar
-  return (TSum (TVar a) t, c)
+  return (TSum a t, c)
 
--- case e1 of | Inl x1 -> e2 | Inr x2 -> e3
-inferType ctx (Case pos e1 x1 e2 x2 e3) = do
+-- case e1 of | Inl x -> e2 | Inr y -> e3
+inferType ctx (Case pos e1 x e2 y e3) = do
   (t1, c1) <- inferType ctx e1
-  a1' <- freshTVar
-  a2' <- freshTVar
-  let (a1, a2) = (TVar a1', TVar a2')
-  let ctxl = M.insert x1 (Type a1) ctx
-  let ctxr = M.insert x2 (Type a2) ctx
-  (t2, c2) <- inferType ctxl e2
-  (t3, c3) <- inferType ctxr e3
-  let constraints = [(t1, TSum a1 a2, pos), (t2, t3, pos)]
-  return (t2, constraints ++ c1 ++ c2 ++ c3)
+  aAux <- freshTVar; let a = TVar aAux
+  let ctx' = M.insert x (Type a) ctx
+  (t2, c2) <- inferType ctx' e2
+  bAux <- freshTVar; let b = TVar bAux
+  let ctx'' = M.insert y (Type b) ctx
+  (t3, c3) <- inferType ctx'' e3
+  return (t2, nub ([(t1, TSum a b, pos), (t2, t3, pos)] ++ c1 ++ c2 ++ c3))
 
--- let x : mt = e1 in e2 (not exactly the same as (fun x : mt -> e2) e1)
+-- let x : t = e1 in e2 (not exactly the same as (fun x : t -> e2) e1)
 -- this implementation is subject to change!
 inferType ctx (Let pos x mt e1 e2) = do
-  (t1, c1) <- inferType ctx e1
-  let cnstrs = case mt of
-        Nothing -> []
-        Just mt' -> [(t1, mt', pos)]
-  let c1' = cnstrs ++ c1
-  let ctx' = M.delete x ctx
-  s1 <- lift $ unify c1'
-  let ctx'' = applySubstEnv ctx' s1
-  let t' = generalize ctx'' t1
-  let ctx''' = M.insert x t' ctx''
-  let ctx'''' = applySubstEnv ctx''' s1
-  (t2, c2) <- inferType ctx'''' e2
+  (t1Aux, c1Aux) <- inferType ctx e1
+  let c1 = case mt of
+        Nothing -> c1Aux
+        Just t -> [(t1Aux, t, pos)] ++ c1Aux
+  s1 <- lift $ unify c1
+  let t1 = applySubst t1Aux s1
+  let ctx' = applySubstEnv ctx s1
+  let ts1 = generalize ctx' t1
+  let ctx'' = M.insert x ts1 ctx
+  (t2, c2) <- inferType ctx'' e2
+  return (t2, nub (c1 ++ c2))
 
-  return (t2, c1' ++ c2)
+-- let rec f (x : mtx) : mtr = e1Aux in e2
+-- e1 = (fun x : mtx -> e1Aux)
+-- t1 = TArrow tx tr
+inferType ctx (LetRec pos f x mtx mtr e1Aux e2) = do
+  let e1 = Abs pos x mtx mtr e1Aux
+  aAux <- freshTVar; let a = TVar aAux
+  let ctx'Aux = M.insert f (Type a) ctx
+  let ctx' = ctx `M.union` ctx'Aux
+  (t1Aux, c1) <- inferType ctx' e1
+  s1 <- lift $ unify c1
+  let t1 = applySubst t1Aux s1
+  let ctx'' = applySubstEnv ctx s1
+  let ts1 = generalize ctx'' t1
+  let ctx'''Aux = M.insert f ts1 ctx
+  let ctx''' = ctx `M.union` ctx'''Aux
+  (t2, c2) <- inferType ctx''' e2
+  return (t2, nub ([(t1, a, pos)] ++ c1 ++ c2))
 
-inferType ctx (LetRec pos f x mtx mtr e1 e2) = do
-  a <- freshTVar
-  b <- freshTVar
-  let ctx' = M.delete f ctx
-  let ctx'' = M.insert f (Type $ TArrow (TVar a) (TVar b)) ctx'
-  (t,c) <- inferType ctx'' (Let pos f (Just $ TArrow (TVar a) (TVar b)) (Abs pos x (Just $ TVar a) (Just $ TVar b) e1) e2)
-  case (mtx, mtr) of
-    (Nothing, Nothing) -> return (t, c)
-    (Just tx, Just tr) -> return (t, (TArrow (TVar a) (TVar b), TArrow tx tr, pos):c)
-    (Just tx, Nothing) -> return (t, (TVar a, tx, pos):c)
-    (Nothing, Just tr) -> return (t, (TVar b, tr, pos):c)
-  
 
 -- Top-level type inference function with an empty context
 inferTypeTop :: Exp -> Error TypeScheme
@@ -280,10 +259,14 @@ applySubstTypeScheme (Forall xs t) subst = Forall xs $ applySubst t (foldr M.del
 applySubstEnv :: Ctx -> Substitution -> Ctx
 applySubstEnv ctx subst = M.map (`applySubstTypeScheme` subst) ctx
 
+-- compose two substitutions
+composeSubst :: Substitution -> Substitution -> Substitution
+composeSubst s1 s2 = M.map (`applySubst` s1) s2 `M.union` s1
+
 -- Extend a substitution. Essentially the composition of a substitution subst
 -- with a singleton substitution [x -> typ].
 extendSubst :: Substitution -> String -> Type -> Substitution
-extendSubst s x typ = M.map (`applySubst` s) (M.singleton x typ) `M.union` s
+extendSubst s x typ = composeSubst s $ M.singleton x typ
 
 -- Instantiate universal type variables with fresh ones
 instantiate :: TypeScheme -> TypeInf Type
@@ -296,8 +279,8 @@ instantiate (Forall vars t) = do
 -- Generalize a the free type variables in a type
 generalize :: Ctx -> Type -> TypeScheme
 generalize ctx t =
-  let vars = nub [v | v <- freeTypeVars t, not $ occursFreeCtx v ctx]
-  in Forall vars t
+  let vars = nub [v | v <- freeTypeVars t, not $ occursFreeCtx v ctx] in
+  Forall vars t
   where
     freeTypeVars :: Type -> [String]
     freeTypeVars (TVar a) = [a]
