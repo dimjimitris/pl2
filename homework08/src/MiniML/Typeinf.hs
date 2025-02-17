@@ -9,8 +9,6 @@ import MiniML.Error
 import MiniML.Print -- For better error messages
 -- import Debug.Trace -- Debug.Trace is your friend
 
-import Data.Maybe (fromMaybe)
-
 -- A Typing context
 type Ctx = M.Map String TypeScheme
 
@@ -85,18 +83,18 @@ inferType ctx (Var pos x) = case M.lookup x ctx of
 -- (fun (x : t1) : t2 -> e) t2 will always be missing in the AST
 -- based on my understanding of the code
 inferType ctx (Abs pos x mt1 mt2 e) = do
-  aAux <- freshTVar; let t1 = Data.Maybe.fromMaybe (TVar aAux) mt1
+  t1 <- maybe (TVar <$> freshTVar) return mt1
   let ctx' = M.insert x (Type t1) ctx
-  (t2, c2Aux) <- inferType ctx' e
-  let c2 = case mt2 of
-        Nothing -> c2Aux
-        Just t2Aux -> [(t2, t2Aux, pos)] ++ c2Aux
-  return (TArrow t1 t2, c2)
+  (t2, c2) <- inferType ctx' e
+  let c0 = case mt2 of
+        Nothing -> []
+        Just t2Aux -> [(t2, t2Aux, pos)]
+  return (TArrow t1 t2, c0 ++ c2)
 
 inferType ctx (App pos e1 e2) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
-  aAux <- freshTVar; let a = TVar aAux
+  a <- TVar <$> freshTVar
   return (a, nub ([(t1, TArrow t2 a, pos)] ++ c1 ++ c2))
 
 inferType ctx (ITE pos e1 e2 e3) = do
@@ -135,20 +133,20 @@ inferType ctx (Pair _ e1 e2) = do
 
 inferType ctx (Fst pos e) = do
   (t, c) <- inferType ctx e
-  aAux <- freshTVar; let a = TVar aAux
-  bAux <- freshTVar; let b = TVar bAux
+  a <- TVar <$> freshTVar
+  b <- TVar <$> freshTVar
   let c0 = [(t, TProd a b, pos)]
   return (a, nub (c0 ++ c))
 
 inferType ctx (Snd pos e) = do
   (t, c) <- inferType ctx e
-  aAux <- freshTVar; let a = TVar aAux
-  bAux <- freshTVar; let b = TVar bAux
+  a <- TVar <$> freshTVar
+  b <- TVar <$> freshTVar
   let c0 = [(t, TProd a b, pos)]
   return (b, nub (c0 ++ c))
 
 inferType _ (Nil _) = do
-  aAux <- freshTVar; let a = TVar aAux
+  a <- TVar <$> freshTVar
   return (TList a, [])
 
 inferType ctx (Cons pos e1 e2) = do
@@ -160,29 +158,29 @@ inferType ctx (Cons pos e1 e2) = do
 inferType ctx (CaseL pos e1 e2 hd tl e3) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
-  aAux <- freshTVar; let a = TVar aAux
+  a <- TVar <$> freshTVar
   let ctx' = M.insert hd (Type a) ctx
   let ctx'' = M.insert tl (Type $ TList a) ctx'
   (t3, c3) <- inferType ctx'' e3
   return (t2, nub ([(t1, TList a, pos), (t2, t3, pos)] ++ c1 ++ c2 ++ c3))
 
 inferType ctx (Inl _ e) = do
-  aAux <- freshTVar; let a = TVar aAux
+  a <- TVar <$> freshTVar
   (t, c) <- inferType ctx e
   return (TSum t a, c)
 
 inferType ctx (Inr _ e) = do
-  aAux <- freshTVar; let a = TVar aAux
+  a <- TVar <$> freshTVar
   (t, c) <- inferType ctx e
   return (TSum a t, c)
 
 -- case e1 of | Inl x -> e2 | Inr y -> e3
 inferType ctx (Case pos e1 x e2 y e3) = do
   (t1, c1) <- inferType ctx e1
-  aAux <- freshTVar; let a = TVar aAux
+  a <- TVar <$> freshTVar
   let ctx' = M.insert x (Type a) ctx
   (t2, c2) <- inferType ctx' e2
-  bAux <- freshTVar; let b = TVar bAux
+  b <- TVar <$> freshTVar
   let ctx'' = M.insert y (Type b) ctx
   (t3, c3) <- inferType ctx'' e3
   return (t2, nub ([(t1, TSum a b, pos), (t2, t3, pos)] ++ c1 ++ c2 ++ c3))
@@ -190,9 +188,10 @@ inferType ctx (Case pos e1 x e2 y e3) = do
 
 inferType ctx (Let pos x mt e1 e2) = do
   (t1Aux, c1Aux) <- inferType ctx e1
-  let c1 = case mt of
-        Nothing -> c1Aux
-        Just t -> [(t1Aux, t, pos)] ++ c1Aux
+  let c0 = case mt of
+        Nothing -> []
+        Just t -> [(t1Aux, t, pos)]
+  let c1 = c0 ++ c1Aux
   s1 <- lift $ unify c1
   let t1 = applySubst t1Aux s1
   let ctx' = applySubstEnv ctx s1
@@ -207,7 +206,7 @@ inferType ctx (Let pos x mt e1 e2) = do
 -- model it as let f = e1 in e2
 inferType ctx (LetRec pos f x mtx mtr e1Aux e2) = do
   let e1 = Abs pos x mtx mtr e1Aux
-  aAux <- freshTVar; let a = TVar aAux
+  a <- TVar <$> freshTVar
   let ctx' = M.insert f (Type a) ctx
   (t1Aux, c1) <- inferType ctx' e1
   s1 <- lift $ unify c1

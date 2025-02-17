@@ -19,8 +19,8 @@ ingredients = [consoleTestReporter, includingOptions [Option (Proxy :: Proxy Qui
 
 main :: IO ()
 main = defaultMainWithIngredients ingredients $ localOption (QuickCheckTests 10000) $ testGroup "act"
-  [ --testProperty "Parser round trip" parserRoundTrip, 
-  testProperty "Type inference" testTypeInf ]
+  [ testProperty "Parser round trip" parserRoundTrip, 
+    testProperty "Type inference" testTypeInf ]
 
 -- A property that for a randomly MiniML as pretty-printing it and parsing it
 -- produces the original program (i.e., `parse . lex . showExp == id`)
