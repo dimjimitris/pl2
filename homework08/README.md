@@ -93,6 +93,19 @@ extended is a mostly straight forward way to handle all constructs of MiniML.
 -------------------------------------------------------------------------------CT-ITE
    Γ ⊢ if e1 then e2 else e3 : t2 | { t1 = bool, t2 = t3 } ∪ C1 ∪ C2 ∪ C3
 
+         Γ ⊢ e1 : t1 | C1      Γ ⊢ e2 : t2 | C2
+----------------------------------------------------------CT-Pair
+             Γ ⊢ (e1, e2) : t1 * t2 | C1 ∪ C2
+
+         Γ ⊢ e : t | C
+--------------------------------CT-Fst          α, β are fresh
+    Γ ⊢ fst e : α | { t = α * β } ∪ C
+
+
+         Γ ⊢ e : t | C
+--------------------------------CT-Snd          α, β are fresh
+    Γ ⊢ snd e : β | { t = α * β } ∪ C
+
 
          Γ ⊢ e : t | C
 -----------------------------------CT-Inl            α is fresh
@@ -106,7 +119,23 @@ extended is a mostly straight forward way to handle all constructs of MiniML.
 
       Γ ⊢ e1 : t1 | C1       Γ, x : α ⊢ e2 : t2 | C2       Γ, y : β ⊢ e3 : t3 | C3
 -------------------------------------------------------------------------------------------CT-Case             α, β are fresh
-    Γ ⊢ case e1 of | inl x -> e2  | inr y -> e3 | {t1 = α + β, t2 = t3}  ∪ C1 ∪ C2 ∪ C3
+    Γ ⊢ case e1 of | inl x -> e2  | inr y -> e3 : t2 {t1 = α + β, t2 = t3}  ∪ C1 ∪ C2 ∪ C3
+
+
+      Γ ⊢ [x ↦ e1]e2 : t2 | C2        Γ ⊢ e1 : t1 | C1
+----------------------------------------------------------------CT-LetPoly
+            Γ ⊢ let x = e1 in e2 : t2 | C1 ∪ C2
+( adapted from 'Types and Programming' by Benjamin C. Pierce : Chapter 22.7 Let-Polymorphism )
+
+
+   Γ, f : α ⊢ let f = (fun x -> e1) in f : t1 | C1         Γ, f : Γ^-(t1) ⊢ e2 : t2 | C2
+-------------------------------------------------------------------------------------------CT-LetRec   α is fresh, Γ^-(τ) = generalize Γ τ
+                    Γ ⊢ let rec f x = e1 in e2 : t2 | { t1 = α } ∪ C1 ∪ C2   
+( adapted from https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system#Typing_rule )
+
+
+
+Γ refers to context (type Ctx in code)
 
 ```
 
