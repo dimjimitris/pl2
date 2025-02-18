@@ -305,7 +305,6 @@ generalize ctx t =
 rename :: (String, String) -> Type -> Type
 rename (x, y) = flip applySubst $ M.singleton x (TVar y)
 
-
 -- Check if a type variable occurs free in a type
 occursFreeType :: String -> Type -> Bool
 occursFreeType x (TVar a) = x == a
