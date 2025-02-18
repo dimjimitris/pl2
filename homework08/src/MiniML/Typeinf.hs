@@ -7,6 +7,7 @@ import Data.List (nub) -- nub removes duplicates from a list. You may find it he
 import MiniML.Syntax
 import MiniML.Error
 import MiniML.Print -- For better error messages
+
 -- import Debug.Trace -- Debug.Trace is your friend
 
 -- A Typing context
@@ -174,7 +175,7 @@ inferType ctx (Inr _ e) = do
   (t, c) <- inferType ctx e
   return (TSum a t, c)
 
--- case e1 of | Inl x -> e2 | Inr y -> e3
+-- case e1 of | inl x -> e2 | inr y -> e3
 inferType ctx (Case pos e1 x e2 y e3) = do
   (t1, c1) <- inferType ctx e1
   a <- TVar <$> freshTVar
@@ -185,7 +186,7 @@ inferType ctx (Case pos e1 x e2 y e3) = do
   (t3, c3) <- inferType ctx'' e3
   return (t2, nub ([(t1, TSum a b, pos), (t2, t3, pos)] ++ c1 ++ c2 ++ c3))
 
-
+-- let x : t = e1 in e2
 inferType ctx (Let pos x mt e1 e2) = do
   (t1Aux, c1Aux) <- inferType ctx e1
   let c0 = case mt of
@@ -200,8 +201,8 @@ inferType ctx (Let pos x mt e1 e2) = do
   (t2, c2) <- inferType ctx'' e2
   return (t2, nub (c1 ++ c2))
 
--- let rec f (x : mtx) : mtr = e1Aux in e2
--- e1 = (fun x : mtx -> e1Aux)
+-- let rec f (x : tx) : tr = e1Aux in e2
+-- e1 = (fun x : tx -> e1Aux)
 -- t1 = TArrow tx tr
 -- model it as let f = e1 in e2
 inferType ctx (LetRec pos f x mtx mtr e1Aux e2) = do
@@ -257,6 +258,17 @@ applySubstEnv :: Ctx -> Substitution -> Ctx
 applySubstEnv ctx subst = M.map (`applySubstTypeScheme` subst) ctx
 
 -- compose two substitutions
+-- suppose s1 models σ1 and s2 models σ2
+-- composeSubst s1 s2 models σ2(σ1)
+-- s2 is a Map String Type, s1 is a Map String Type
+-- s2 contains things of the form [x -> σ2(x)], where σ2(x) is a Type
+-- M.map (`applySubst` s1) s2 will do σ2(χ) `applySubst` s1 for each χ in s2
+-- so we get σ1(σ2(χ)) for each x in s2
+-- M.map (`applySubst` s1) s2 contains things of the form [x -> σ1(σ2(x))] for each x in s2
+-- if there is an x in s1 that is not in s2, then σ1(σ2(χ)) = σ1(x) and we need to add it to the result
+-- thus we do the final union with s1
+-- a `M.union` b prefers the values in a if there is a key that is in both a and b
+-- that is why we put M.map (`applySubst` s1) s2 first
 composeSubst :: Substitution -> Substitution -> Substitution
 composeSubst s1 s2 = M.map (`applySubst` s1) s2 `M.union` s1
 
@@ -270,8 +282,7 @@ instantiate :: TypeScheme -> TypeInf Type
 instantiate (Type t) = return t
 instantiate (Forall vars t) = do
   freshVars <- mapM (const freshTVar) vars
-  let subst = M.fromList $ zip vars (map TVar freshVars)
-  return $ applySubst t subst
+  return $ foldl (flip rename) t (zip vars freshVars)
 
 -- Generalize a the free type variables in a type
 generalize :: Ctx -> Type -> TypeScheme
@@ -290,17 +301,10 @@ generalize ctx t =
     freeTypeVars (TList t') = freeTypeVars t'
 
 
-
 -- Rename a free type variable in a type
 rename :: (String, String) -> Type -> Type
-rename _ TUnit = TUnit
-rename _ TInt = TInt
-rename _ TBool = TBool
-rename subst (TArrow t1 t2) = TArrow (rename subst t1) (rename subst t2)
-rename subst (TProd t1 t2) = TProd (rename subst t1) (rename subst t2)
-rename subst (TSum t1 t2) = TSum (rename subst t1) (rename subst t2)
-rename subst (TList t) = TList (rename subst t)
-rename (x, y) (TVar a) = if x == a then TVar y else TVar a
+rename (x, y) = flip applySubst $ M.singleton x (TVar y)
+
 
 -- Check if a type variable occurs free in a type
 occursFreeType :: String -> Type -> Bool
