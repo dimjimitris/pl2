@@ -145,7 +145,7 @@ impl Bytecode {
             // instruction to be printed at the beginning of each line. May be
             // useful for debugging purposes.
 
-            // program.push_str(&format!("0x{:X}: ", i));
+            program.push_str(&format!("0x{:X}: ", i));
 
             i += 1;
 
