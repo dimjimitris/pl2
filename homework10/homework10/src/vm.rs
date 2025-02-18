@@ -166,10 +166,10 @@ impl VM {
                     let size = self.pop_stack().to_int();
 
                     for error_idx in 0..3 {
-                        if error_idx > 1 {
+                        if error_idx >= 2 {
                             panic!("Run out of heap memory");
                         }
-
+                        
                         let mut words = Vec::<Word>::with_capacity(size as usize);
                         for _ in 0..size {
                             words.push(self.pop_stack());

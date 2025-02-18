@@ -52,7 +52,7 @@ pub struct Heap {
 
 impl Heap {
     pub fn new(total_words: usize) -> Self {
-        let vec = vec![Word { w: 0 }; total_words];
+        let vec = vec![Word::from_int(0); total_words];
         let memory = vec.into_boxed_slice();
         Heap {
             heap: memory,
@@ -115,19 +115,13 @@ impl Heap {
                 root_curr_addr = self.to_start_addr;
             }
 
-            loop {
-                if (idx == 0 && root_curr_addr >= stack.len())
-                    || (idx == 1 && root_curr_addr >= to_next_addr)
-                {
-                    // first pass: idx == 0, will go through all of the stack slice we
-                    // supply. So root_curr_addr in [0, stack.len())
-                    // second pass: idx == 1, will go through all of the to-space, considering
-                    // to-space memory entries added as the algorithm moves forward. So
-                    // root_curr_addr in [self.to_start_addr, to_next_addr), where to_next_addr
-                    // will dynamically change
-                    break;
-                }
-
+            // first pass: idx == 0, will go through all of the stack slice we
+            // supply. So root_curr_addr in [0, stack.len())
+            // second pass: idx == 1, will go through all of the to-space, considering
+            // to-space memory entries added as the algorithm moves forward. So
+            // root_curr_addr in [self.to_start_addr, to_next_addr), where to_next_addr
+            // will dynamically change
+            while root_curr_addr < if idx == 0 { stack.len() } else { to_next_addr } {
                 // get the root word we will be examining
                 let root_word = if idx == 0 {
                     stack[root_curr_addr]
@@ -175,7 +169,7 @@ impl Heap {
                         if from_curr_addr >= self.to_start_addr
                             && from_curr_addr < self.to_start_addr + self.size / 2
                         {
-                            //Case 2
+                            // Case 2
                             // root word is a pointer that points to from_curr_addr
                             // from_curr_addr is in to-space
                             // we do not need to do anything
