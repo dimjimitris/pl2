@@ -44,10 +44,10 @@ impl Debug for Word {
 
 pub struct Heap {
     pub heap: Box<[Word]>,
-    size: usize,                // The size of the heap
-    from: usize,                // The index of the from-space
-    to: usize,                  // The index of the to-space
-    free_from_hp: usize,        // The heap pointer to the next free slot in the from space
+    size: usize,         // The size of the heap
+    from: usize,         // The index of the from-space
+    to: usize,           // The index of the to-space
+    free_from_hp: usize, // The heap pointer to the next free slot in the from space
 }
 
 impl Heap {
@@ -91,7 +91,7 @@ impl Heap {
         self.heap[h_addr + offset]
     }
 
-    pub fn gc(&mut self, words: &mut [Word]) -> () {
+    pub fn gc2(&mut self, words: &mut [Word]) -> () {
         let (a_free_to_hp0, a_free_to_hp) = self.gc_aux_1(self.to, self.to, words);
         let (_, b_free_to_hp) = self.gc_aux_2(self.to, a_free_to_hp, a_free_to_hp0);
         // update to, from, and free_from_hp
@@ -116,12 +116,7 @@ impl Heap {
         (size, tag as u8)
     }
 
-    fn gc_aux_1(
-        &mut self,
-        to: usize,
-        mut free_to_hp: usize,
-        words: &mut [Word]
-    ) -> (usize, usize) {
+    fn gc_aux_1(&mut self, to: usize, mut free_to_hp: usize, words: &mut [Word]) -> (usize, usize) {
         let free_to_hp0 = free_to_hp;
 
         for rword in words.iter_mut().filter(|w| w.is_pointer()) {
@@ -161,6 +156,79 @@ impl Heap {
             }
         }
         (free_to_hp0, free_to_hp)
+    }
+
+    pub fn gc(&mut self, words: &mut [Word]) -> () {
+        let mut free_to_hp = self.to;
+        let mut used_root_address;
+
+        for idx in 0..2 {
+            if idx == 0 {
+                free_to_hp = self.to;
+                used_root_address = 0;
+            } else {
+                free_to_hp = free_to_hp;
+                used_root_address = self.to;
+            }
+
+            loop {
+                if (idx == 0 && used_root_address >= words.len())
+                    || (idx == 1 && used_root_address >= free_to_hp)
+                {
+                    break;
+                }
+
+                let rword = if idx == 0 { words[used_root_address] } else { self.heap[used_root_address] };
+
+                if rword.is_pointer() {
+                    let used_from_hp = rword.to_pointer();
+                    // rword points to fword
+                    let fword = self.heap[used_from_hp];
+
+                    if !fword.is_pointer() {
+                        // Case 1
+                        // fword is not a pointer, fword is a header
+                        // rword points to the header of a block in the from-space
+                        let (size, _) = self.header_decompose(fword);
+                        let word_cnt = 1 + size;
+
+                        let faddresses = used_from_hp..used_from_hp + word_cnt;
+                        self.heap.copy_within(faddresses, free_to_hp);
+
+                        // the pointer from the root set, rword, is updated to hold the new
+                        // address of the block in the to-space
+                        if idx == 0 {
+                            words[used_root_address] = Word::from_pointer(free_to_hp);
+                        } else {
+                            self.heap[used_root_address] = Word::from_pointer(free_to_hp);
+                        }
+
+                        // the old memory location becomes a forwarding pointer
+                        self.heap[used_from_hp] = Word::from_pointer(free_to_hp);
+
+                        free_to_hp += word_cnt;
+                    } else {
+                        // check if rword points to the to-space
+                        if used_from_hp >= self.to && used_from_hp < self.to + self.size / 2 {
+                            //Case 2
+                            // no action is needed
+                        } else {
+                            // Case 3
+                            // fword is a pointer
+                            if idx == 0 {
+                                words[used_root_address] = fword;
+                            } else {
+                                self.heap[used_root_address] = fword;
+                            }
+                        }
+                    }
+                }
+                used_root_address += 1;
+            }
+        }
+        // update to, from, and free_from_hp
+        mem::swap(&mut self.from, &mut self.to);
+        self.free_from_hp = free_to_hp;
     }
 
     fn gc_aux_2(
