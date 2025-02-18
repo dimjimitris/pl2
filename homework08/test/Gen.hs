@@ -18,7 +18,8 @@ genTypeSize s =
     frequency [ (2, elements [ TInt, TBool, TUnit ])
               , (1, liftM2 TArrow genTypeS genTypeS)
               , (1, liftM2 TSum genTypeS genTypeS)
-              , (1, liftM2 TProd genTypeS genTypeS) ]
+              , (1, liftM2 TProd genTypeS genTypeS)
+              , (1, liftM TList genTypeS) ]
     where
         genTypeS = genTypeSize (s-1)
 
@@ -86,97 +87,97 @@ genTExpSize :: M.Map Type [String]  -- a map from types to variables with the co
 genTExpSize env next t sz =
   case t of
     TUnit ->
-      frequency $ (6, genLit) : if sz <= 0 then [] else [
-                  (2, genApp),
-                  (2, genFst),
-                  (2, genSnd),
-                  (2, genCase),
-                  (2, genCaseL),
-                  (2, genLet),
-                  (2, genITE),
+      frequency $ (3, genLit) : if sz <= 0 then [] else [
+                  (1, genApp),
+                  (1, genFst),
+                  (1, genSnd),
+                  (1, genCase),
+                  (1, genCaseL),
+                  (1, genLet),
+                  (1, genITE),
                   (1, genLetRec)
                 ]
                 ++ zip [1..] genVar'
 
     TInt ->
-      frequency $ (6, genLit) : if sz <= 0 then [] else [
-                  (4, genBop'),
-                  (3, genApp),
-                  (3, genCase),
-                  (3, genCaseL),
-                  (3, genLet),
-                  (2, genITE),
-                  (2, genFst),
-                  (2, genSnd),
+      frequency $ (3, genLit) : if sz <= 0 then [] else [
+                  (1, genBop'),
+                  (1, genApp),
+                  (1, genCase),
+                  (1, genCaseL),
+                  (1, genLet),
+                  (1, genITE),
+                  (1, genFst),
+                  (1, genSnd),
                   (1, genLetRec)
                 ]
                 ++ zip [1..] genVar'
 
     TBool ->
-      frequency $ (6, genLit) : if sz <= 0 then [] else [
-                  (4, genBop'),
-                  (4, genUop),
-                  (3, genApp),
-                  (3, genCase),
-                  (3, genCaseL),
-                  (3, genLet),
-                  (2, genFst),
-                  (2, genSnd),
-                  (2, genITE),
+      frequency $ (3, genLit) : if sz <= 0 then [] else [
+                  (1, genBop'),
+                  (1, genUop),
+                  (1, genApp),
+                  (1, genCase),
+                  (1, genCaseL),
+                  (1, genLet),
+                  (1, genFst),
+                  (1, genSnd),
+                  (1, genITE),
                   (1, genLetRec)
                 ]
                 ++ zip [1..] genVar'
 
     TArrow t1 t2 ->
-      frequency $ (6, genAbs t1 t2) : if sz <= 0 then [] else [
-                  (3, genLet),
-                  (3, genApp),
-                  (2, genFst),
-                  (2, genSnd),
-                  (2, genITE),
-                  (2, genCase),
-                  (2, genCaseL),
+      frequency $ (3, genAbs t1 t2) : if sz <= 0 then [] else [
+                  (1, genLet),
+                  (1, genApp),
+                  (1, genFst),
+                  (1, genSnd),
+                  (1, genITE),
+                  (1, genCase),
+                  (1, genCaseL),
                   (1, genLetRec)
                 ]
                 ++ zip [1..] genVar'
 
     TProd t1 t2 ->
-      frequency $ (6, genPair t1 t2) : if sz <= 0 then [] else [
-                  (3, genLet),
-                  (3, genApp),
-                  (3, genITE),
-                  (3, genCase),
-                  (3, genCaseL),
-                  (2, genFst),
-                  (2, genSnd),
+      frequency $ (3, genPair t1 t2) : if sz <= 0 then [] else [
+                  (1, genLet),
+                  (1, genApp),
+                  (1, genITE),
+                  (1, genCase),
+                  (1, genCaseL),
+                  (1, genFst),
+                  (1, genSnd),
                   (1, genLetRec)
                 ]
                 ++ zip [1..] genVar'
 
     TSum t1 t2 ->
-      frequency $ [ (6, genInl t1),
-                    (6, genInr t2) ] ++ if sz <= 0 then [] else [
-                    (3, genLet),
-                    (3, genApp),
-                    (3, genITE),
-                    (3, genCase),
-                    (3, genCaseL),
-                    (2, genFst),
-                    (2, genSnd),
+      frequency $ [ (3, genInl t1),
+                    (3, genInr t2) ] ++ if sz <= 0 then [] else [
+                    (1, genLet),
+                    (1, genApp),
+                    (1, genITE),
+                    (1, genCase),
+                    (1, genCaseL),
+                    (1, genFst),
+                    (1, genSnd),
                     (1, genLetRec)
                   ]
                   ++ zip [1..] genVar'
 
     TList t' ->
-      frequency $ (6, genNil) : if sz <= 0 then [] else [
-                  (4, genCons t'),
-                  (3, genLet),
-                  (3, genApp),
-                  (3, genITE),
-                  (3, genCase),
-                  (3, genCaseL),
-                  (2, genFst),
-                  (2, genSnd),
+      frequency $ (3, genNil) : if sz <= 0 then [] else [
+                  (1, genCons t'),
+                  (1, genLet),
+                  (1, genApp),
+                  (1, genITE),
+                  (1, genCase),
+                  (1, genCaseL),
+                  (1, genFst),
+                  (1, genSnd),
                   (1, genLetRec)
                 ]
                 ++ zip [1..] genVar'
@@ -197,16 +198,15 @@ genTExpSize env next t sz =
 
     -- abstraction
     genAbs t1 t2 = do
-      let name = "x_" ++ show next
+      let name = "x_" <> show next
       let env' = addVar name t1 env
       body <- genTExpSize env' (next + 1) t2 (sz - 1)
-      -- ! maybe just
       return $ Abs nowhere name Nothing Nothing body
 
     -- unit, integers, booleans
     genLit =
       case t of
-        TUnit -> return (Unit nowhere) -- consider units to be literals for simplicity
+        TUnit -> return (Unit nowhere)
         TInt -> liftM (NumLit nowhere) arbitrary
         TBool -> liftM (BoolLit nowhere) arbitrary
         _ -> error $ "genLit: invalid literal type: " ++ show t
@@ -267,8 +267,8 @@ genTExpSize env next t sz =
       t1 <- genType
       t2 <- genType
       e <- genTExpS (TSum t1 t2)
-      let name1 = "y1_" ++ show next
-      let name2 = "y2_" ++ show next
+      let name1 = "y1_" <> show next
+      let name2 = "y2_" <> show next
       let env1 = addVar name1 t1 env
       let env2 = addVar name2 t2 env
       e1 <- genTExpSize env1 (next + 1) t (sz - 1)
@@ -279,8 +279,8 @@ genTExpSize env next t sz =
     genCaseL = do
       t' <- genType
       e <- genTExpS (TList t')
-      let name_hd = "y1_" ++ show next
-      let name_tl = "y2_" ++ show next
+      let name_hd = "y1_" <> show next
+      let name_tl = "y2_" <> show next
       let env' = addVar name_tl (TList t') (addVar name_hd t' env)
       e1 <- genTExpSize env (next + 1) t (sz - 1)
       e2 <- genTExpSize env' (next + 1) t (sz - 1)
@@ -288,7 +288,7 @@ genTExpSize env next t sz =
 
     -- let
     genLet = do
-      let name = "x_" ++ show next
+      let name = "x_" <> show next
       t' <- genType
       e <- genTExpS t'
       let env' = addVar name t' env
@@ -297,9 +297,9 @@ genTExpSize env next t sz =
 
     -- let rec
     genLetRec = do
-      let xname = "x_" ++ show next
+      let xname = "x_" <> show next
       xt <- genType
-      let fname = "f_" ++ show next
+      let fname = "f_" <> show next
       let env' = addVar fname (TArrow xt t) env
       body <- genTExpSize (addVar xname xt env') (next + 1) t (sz - 1)
       rest <- genTExpSize env' (next + 1) t (sz - 1)
@@ -313,7 +313,10 @@ genTExpSize env next t sz =
       return $ Cons nowhere e1 e2
 
     -- helper functions
+    genTExpS :: Type -> Gen Exp
     genTExpS t' = genTExpSize env next t' (sz - 1)
+
+    addVar :: String -> Type -> M.Map Type [String] -> M.Map Type [String]
     addVar x typ = M.insertWith (++) typ [x] -- (returns a function that takes an environment and adds a variable to it)
   
 

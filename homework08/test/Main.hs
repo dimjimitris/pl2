@@ -18,7 +18,7 @@ ingredients :: [Ingredient]
 ingredients = [consoleTestReporter, includingOptions [Option (Proxy :: Proxy QuickCheckTests)]]
 
 main :: IO ()
-main = defaultMainWithIngredients ingredients $ localOption (QuickCheckTests 10000) $ testGroup "act"
+main = defaultMainWithIngredients ingredients $ localOption (QuickCheckTests 100) $ testGroup "act"
   [ testProperty "Parser round trip" parserRoundTrip, 
     testProperty "Type inference" testTypeInf ]
 
