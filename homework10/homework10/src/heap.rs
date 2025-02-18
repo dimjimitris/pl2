@@ -96,10 +96,17 @@ impl Heap {
     }
 
     pub fn gc(&mut self, stack: &mut [Word]) -> () {
+        // the next address in the to-space where we can write
         let mut to_next_addr = self.to_start_addr;
+        // the current address in the root space where we read from
         let mut root_curr_addr;
 
+        // garbage collection happens in 2 passes
+        // first pass: idx == 0 and root-space == stack
+        // second pass: idx == 1 and root-space == to-space
         for idx in 0..2 {
+            // initialize to_next_addr and root_curr_addr variables
+            // properly for each pass
             if idx == 0 {
                 to_next_addr = self.to_start_addr;
                 root_curr_addr = 0;
@@ -112,64 +119,88 @@ impl Heap {
                 if (idx == 0 && root_curr_addr >= stack.len())
                     || (idx == 1 && root_curr_addr >= to_next_addr)
                 {
+                    // first pass: idx == 0, will go through all of the stack slice we
+                    // supply. So root_curr_addr in [0, stack.len())
+                    // second pass: idx == 1, will go through all of the to-space, considering
+                    // to-space memory entries added as the algorithm moves forward. So
+                    // root_curr_addr in [self.to_start_addr, to_next_addr), where to_next_addr
+                    // will dynamically change
                     break;
                 }
 
+                // get the root word we will be examining
                 let root_word = if idx == 0 {
                     stack[root_curr_addr]
                 } else {
                     self.heap[root_curr_addr]
                 };
 
+                // if the root word is not a pointer, there is nothing to do...
                 if root_word.is_pointer() {
+                    // root word is a pointer
                     let from_curr_addr = root_word.to_pointer();
-                    // rword points to fword
+                    // root word is a pointer that points to from word
                     let from_word = self.heap[from_curr_addr];
 
                     if !from_word.is_pointer() {
                         // Case 1
-                        // fword is not a pointer, fword is a header
-                        // rword points to the header of a block in the from-space
+                        // from word is not a pointer
+                        // it is a header of a block in the from-space
                         let (size, _) = self.header_decompose(from_word);
                         let word_cnt = 1 + size;
 
+                        // we copy this block to the to-space
                         let from_addrs = from_curr_addr..from_curr_addr + word_cnt;
                         self.heap.copy_within(from_addrs, to_next_addr);
 
-                        // the pointer from the root set, rword, is updated to hold the new
+                        // the root word is a pointer and needs to be updated to hold the new
                         // address of the block in the to-space
                         if idx == 0 {
+                            // root word is in the stack
                             stack[root_curr_addr] = Word::from_pointer(to_next_addr);
                         } else {
+                            // root word is in the heap
                             self.heap[root_curr_addr] = Word::from_pointer(to_next_addr);
                         }
 
-                        // the old memory location becomes a forwarding pointer
+                        // the memory location of the from word is updated to point to
+                        // the new address of the block in the to-space
+                        // from word is now a forwarding pointer
                         self.heap[from_curr_addr] = Word::from_pointer(to_next_addr);
 
+                        // get the next available address, where we can write
                         to_next_addr += word_cnt;
                     } else {
-                        // check if rword points to the to-space
+                        // from word is a pointer
                         if from_curr_addr >= self.to_start_addr
                             && from_curr_addr < self.to_start_addr + self.size / 2
                         {
                             //Case 2
-                            // no action is needed
+                            // root word is a pointer that points to from_curr_addr
+                            // from_curr_addr is in to-space
+                            // we do not need to do anything
                         } else {
                             // Case 3
-                            // fword is a pointer
+                            // root word is a pointer that points to from_curr_addr
+                            // from_curr_addr in in from-space, this means that is is
+                            // a forwarding pointer
+                            // we update root word to point to the same address
+                            // This we set root word equal to from word
                             if idx == 0 {
+                                // root word is in the stack
                                 stack[root_curr_addr] = from_word;
                             } else {
+                                // root word is in the heap
                                 self.heap[root_curr_addr] = from_word;
                             }
                         }
                     }
                 }
+                // move to the next address in the root-space
                 root_curr_addr += 1;
             }
         }
-        // update to, from, and free_from_hp
+        // update from_start_addr, to_start_addr, and from_next_addr
         mem::swap(&mut self.from_start_addr, &mut self.to_start_addr);
         self.from_next_addr = to_next_addr;
     }
