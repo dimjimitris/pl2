@@ -49,7 +49,7 @@ impl VM {
         loop {
             let i_opcode = self.pop_bytecode::<1>();
             let opcode = Opcode::from_u8(i_opcode[0])
-                .expect(&format!("Invalid opcode {} at i_addr {}", i_opcode[0], self.ip));
+                .unwrap_or_else(|| panic!("Invalid opcode {} at i_addr {}", i_opcode[0], self.ip));
 
             match opcode {
                 Opcode::Halt => {
@@ -206,7 +206,7 @@ impl VM {
                 Opcode::Clock => {
                     let elapsed = ts.elapsed().as_secs_f64();
                     io::stdout()
-                        .write_all((&format!("{:.4}", elapsed)).as_bytes())
+                        .write_all(format!("{:.4}", elapsed).as_bytes())
                         .expect("Failed to write output");
                 }
             }
