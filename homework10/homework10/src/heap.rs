@@ -1,4 +1,7 @@
-use std::{fmt::{self, Debug}, mem, vec};
+use std::{
+    fmt::{self, Debug},
+    mem, vec,
+};
 
 #[derive(Clone, Copy)]
 pub struct Word {
@@ -41,10 +44,10 @@ impl Debug for Word {
 
 pub struct Heap {
     pub heap: Box<[Word]>,
-    size: usize,            // The size of the heap
-    from: usize,            // The index of the from-space
-    to: usize,              // The index of the to-space
-    free_from_hp: usize,              // The heap pointer to the next free slot in the from space
+    size: usize,                // The size of the heap
+    from: usize,                // The index of the from-space
+    to: usize,                  // The index of the to-space
+    free_from_hp: usize,        // The heap pointer to the next free slot in the from space
 }
 
 impl Heap {
@@ -65,7 +68,7 @@ impl Heap {
         let header = self.header_compose(size, tag);
         let word_cnt = 1 + size;
 
-        if self.free_from_hp + word_cnt >= self.from + self.size / 2 {
+        if self.free_from_hp + word_cnt > self.from + self.size / 2 {
             None
         } else {
             let hp_start = self.free_from_hp;
@@ -85,7 +88,7 @@ impl Heap {
             panic!("Invalid heap address: {}", h_addr + offset);
         }
 
-        self.heap[h_addr + offset] 
+        self.heap[h_addr + offset]
     }
 
     pub fn gc(&mut self, words: &mut [Word]) -> () {
@@ -99,7 +102,7 @@ impl Heap {
     fn header_compose(&self, size: usize, tag: u8) -> Word {
         let size = (size << 8) & 0x7F_FF_FF_00;
         let tag = (tag as usize) & 0x00_00_00_FF;
-        
+
         // everything will be shifted by 1 bit to the left
         // lsb of the word will be 1
         Word::from_int((size | tag) as i32)
@@ -113,12 +116,17 @@ impl Heap {
         (size, tag as u8)
     }
 
-    fn gc_aux_1(&mut self, to: usize, mut free_to_hp: usize, words: &mut [Word]) -> (usize, usize) {
+    fn gc_aux_1(
+        &mut self,
+        to: usize,
+        mut free_to_hp: usize,
+        words: &mut [Word]
+    ) -> (usize, usize) {
         let free_to_hp0 = free_to_hp;
 
         for rword in words.iter_mut().filter(|w| w.is_pointer()) {
             // rword belongs to the root set.
-            
+
             let used_from_hp = rword.to_pointer();
             // rword points to fword
             let fword = self.heap[used_from_hp];
@@ -132,7 +140,7 @@ impl Heap {
 
                 let faddresses = used_from_hp..used_from_hp + word_cnt;
                 self.heap.copy_within(faddresses, free_to_hp);
-                
+
                 // the pointer from the root set, rword, is updated to hold the new
                 // address of the block in the to-space
                 *rword = Word::from_pointer(free_to_hp);
@@ -155,7 +163,12 @@ impl Heap {
         (free_to_hp0, free_to_hp)
     }
 
-    fn gc_aux_2(&mut self, to: usize, mut free_to_hp: usize, mut used_root_address : usize) -> (usize, usize) {
+    fn gc_aux_2(
+        &mut self,
+        to: usize,
+        mut free_to_hp: usize,
+        mut used_root_address: usize,
+    ) -> (usize, usize) {
         let free_to_hp0 = free_to_hp;
 
         while used_root_address < free_to_hp {
@@ -171,16 +184,16 @@ impl Heap {
                     // rword points to the header of ablock in the from-space
                     let (size, _) = self.header_decompose(fword);
                     let word_cnt = 1 + size;
-    
+
                     let faddresses = used_from_hp..used_from_hp + word_cnt;
                     self.heap.copy_within(faddresses, free_to_hp);
-                    
+
                     // the pointer from the root set, rword, is updated to hold the new
                     // address of the block in the to-space
                     self.heap[used_root_address] = Word::from_pointer(free_to_hp);
                     // the old memory location becomes a forwarding pointer
                     self.heap[used_from_hp] = Word::from_pointer(free_to_hp);
-    
+
                     free_to_hp += word_cnt;
                 } else {
                     // check if rword points to the to-space
@@ -199,6 +212,3 @@ impl Heap {
         (free_to_hp0, used_root_address)
     }
 }
-
-
-

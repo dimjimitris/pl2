@@ -9,10 +9,10 @@ pub const HEAP_SIZE: usize = 1 << 20;
 /// The VM struct
 pub struct VM {
     pub bytecode: Bytecode,
-    stack: [Word; STACK_SIZE], // Fixed-size stack of words
-    sp: usize,          // Stack pointer. Points to the next free slot in the stack.
-    ip: usize,                 // Instruction pointer
-    heap: Heap,                // The heap
+    stack: [Word; STACK_SIZE],  // Fixed-size stack of words
+    sp: usize,                  // Stack pointer. Points to the next free slot in the stack.
+    ip: usize,                  // Instruction pointer
+    heap: Heap,                 // The heap
 }
 
 impl VM {
@@ -165,7 +165,11 @@ impl VM {
                     let tag = self.pop_stack().to_int();
                     let size = self.pop_stack().to_int();
 
-                    loop {
+                    for error_idx in 0..3 {
+                        if error_idx > 1 {
+                            panic!("Run out of heap memory");
+                        }
+
                         let mut words = Vec::<Word>::with_capacity(size as usize);
                         for _ in 0..size {
                             words.push(self.pop_stack());
@@ -212,7 +216,7 @@ impl VM {
 
     // Pop the next N bytes from the bytecode and move instruction pointer
     fn pop_bytecode<const N: usize>(&mut self) -> [u8; N] {
-        if self.ip + N >= self.bytecode.instructions.len() {
+        if self.ip + N > self.bytecode.instructions.len() {
             panic!("Unexpected end of bytecode")
         }
         let mut bytes = [0; N];
