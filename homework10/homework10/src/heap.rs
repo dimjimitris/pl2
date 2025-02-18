@@ -11,7 +11,7 @@ pub struct Word {
 impl Word {
     pub fn from_pointer(ptr: usize) -> Word {
         Word {
-            w: (ptr as i32) << 1 | 0,
+            w: (ptr as i32) << 1,
         }
     }
 
@@ -74,8 +74,8 @@ impl Heap {
             let from_curr_addr = self.from_next_addr;
 
             self.heap[from_curr_addr] = header;
-            for i in 0..size {
-                self.heap[from_curr_addr + i + 1] = words[i];
+            for (i, word) in words.iter().enumerate().take(size) {
+                self.heap[from_curr_addr + i + 1] = *word;
             }
             self.from_next_addr += word_cnt;
 
@@ -107,6 +107,7 @@ impl Heap {
         for idx in 0..2 {
             // initialize to_next_addr and root_curr_addr variables
             // properly for each pass
+            #[allow(clippy::self_assignment)]
             if idx == 0 {
                 to_next_addr = self.to_start_addr;
                 root_curr_addr = 0;

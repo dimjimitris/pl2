@@ -196,7 +196,7 @@ impl Bytecode {
                     i += 2;
                 }
                 Some(Opcode::Push1) => {
-                    let lit = instrs[i] as u8;
+                    let lit = instrs[i];
                     program.push_str(&format!("Push1 {lit}\n"));
                     i += 1;
                 }
@@ -229,6 +229,6 @@ impl Bytecode {
                 None => return Err(format!("Invalid opcode at addr {}", i - 1)),
             }
         }
-        return Ok(program);
+        Ok(program)
     }
 }

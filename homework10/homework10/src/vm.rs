@@ -1,7 +1,7 @@
 use crate::bytecode::{Bytecode, Opcode};
 use crate::heap::{Heap, Word};
-use std::time::Instant;
 use std::io::{self, Read, Write};
+use std::time::Instant;
 
 pub const STACK_SIZE: usize = 1 << 14;
 pub const HEAP_SIZE: usize = 1 << 20;
@@ -9,10 +9,10 @@ pub const HEAP_SIZE: usize = 1 << 20;
 /// The VM struct
 pub struct VM {
     pub bytecode: Bytecode,
-    stack: [Word; STACK_SIZE],  // Fixed-size stack of words
-    sp: usize,                  // Stack pointer. Points to the next free slot in the stack.
-    ip: usize,                  // Instruction pointer
-    heap: Heap,                 // The heap
+    stack: [Word; STACK_SIZE], // Fixed-size stack of words
+    sp: usize,                 // Stack pointer. Points to the next free slot in the stack.
+    ip: usize,                 // Instruction pointer
+    heap: Heap,                // The heap
 }
 
 impl VM {
@@ -68,8 +68,7 @@ impl VM {
                 }
                 Opcode::Jumpi => {
                     let val = self.pop_stack().to_int();
-                    let i_addr = <u16>::try_from(val)
-                        .expect("Jump address out of bounds");
+                    let i_addr = <u16>::try_from(val).expect("Jump address out of bounds");
                     self.jump(i_addr);
                 }
                 Opcode::Dup => {
@@ -169,7 +168,7 @@ impl VM {
                         if error_idx >= 2 {
                             panic!("Run out of heap memory");
                         }
-                        
+
                         let mut words = Vec::<Word>::with_capacity(size as usize);
                         for _ in 0..size {
                             words.push(self.pop_stack());
@@ -188,13 +187,12 @@ impl VM {
                                 for word in words {
                                     self.push_stack(word);
                                 }
-    
+
                                 // run garbage collection and try again
                                 self.heap.gc(&mut self.stack[..self.sp]);
                             }
                         }
                     }
-
                 }
                 Opcode::Load => {
                     let h_addr = self.pop_stack().to_pointer();
@@ -210,7 +208,6 @@ impl VM {
                         .expect("Failed to write output");
                 }
             }
-
         }
     }
 
@@ -244,7 +241,7 @@ impl VM {
         self.stack[self.sp]
     }
 
-    fn peek_stack(&self, depth : usize) -> Word {
+    fn peek_stack(&self, depth: usize) -> Word {
         if self.sp < depth + 1 {
             panic!("Stack underflow (peek)")
         }
@@ -259,11 +256,11 @@ impl VM {
         self.sp += 1;
     }
 
-    fn put_stack(&mut self, depth : usize, word: Word) -> () {
+    fn put_stack(&mut self, depth: usize, word: Word) -> () {
         if self.sp < depth + 1 {
             panic!("Stack underflow (put)")
         }
-        self.stack[self.sp - depth - 1] = word; 
+        self.stack[self.sp - depth - 1] = word;
     }
 
     fn bop(&mut self, op: fn(i32, i32) -> i32) -> () {
