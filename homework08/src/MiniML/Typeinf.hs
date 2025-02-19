@@ -76,10 +76,10 @@ inferType _ (BoolLit _ _) = return (TBool, [])
 
 -- rest of cases...
 {-
-        x : s ∈ Γ
-        t = instantiate(s)
-    ---------------------------CT-Var
-         Γ ⊢ x : t | {} 
+      x : s ∈ Γ
+      t = instantiate(s)
+--------------------------------CT-Var
+        Γ ⊢ x : t | {} 
 -}
 inferType ctx (Var pos x) = case M.lookup x ctx of
   Nothing -> lift $ typeError pos $ "Unbound variable " <> x
