@@ -75,12 +75,28 @@ inferType _ (NumLit _ _) = return (TInt, [])
 inferType _ (BoolLit _ _) = return (TBool, [])
 
 -- rest of cases...
+{-
+        x : s ∈ Γ
+        t = instantiate(s)
+    ---------------------------CT-Var
+         Γ ⊢ x : t | {} 
+-}
 inferType ctx (Var pos x) = case M.lookup x ctx of
   Nothing -> lift $ typeError pos $ "Unbound variable " <> x
   Just scheme -> do
     t <- instantiate scheme
     return (t, [])
 
+{-
+        Γ, x : t1 ⊢ e : t2 | C
+---------------------------------------------CT-AbsAnnot
+    Γ ⊢ (fun x : t1 -> e) : t1 -> t2 | C
+
+
+        Γ, x : α ⊢ e : t2 | C
+---------------------------------------CT-Abs             α is fresh
+    Γ ⊢ (fun x -> e) : α -> t2 | C
+-}
 -- (fun (x : t1) : t2 -> e) t2 will always be missing in the AST
 -- based on my understanding of the code
 inferType ctx (Abs pos x mt1 mt2 e) = do
@@ -92,12 +108,23 @@ inferType ctx (Abs pos x mt1 mt2 e) = do
         Just t2Aux -> [(t2, t2Aux, pos)]
   return (TArrow t1 t2, c0 ++ c2)
 
+{-
+             Γ ⊢ e1 : t1 | C1
+             Γ ⊢ e2 : t2 | C2        
+-------------------------------------------------CT-App   α is fresh
+    Γ ⊢ e1 e2 : α | {t1 = t2 -> α} ∪ C1 ∪ C2
+-}
 inferType ctx (App pos e1 e2) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
   a <- TVar <$> freshTVar
   return (a, nub ([(t1, TArrow t2 a, pos)] ++ c1 ++ c2))
 
+{-
+        Γ ⊢ e1 : t1 | C1       Γ ⊢ e2 : t2 | C2       Γ ⊢ e3 : t3 | C3
+-------------------------------------------------------------------------------CT-ITE
+   Γ ⊢ if e1 then e2 else e3 : t2 | { t1 = bool, t2 = t3 } ∪ C1 ∪ C2 ∪ C3
+-}
 inferType ctx (ITE pos e1 e2 e3) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
@@ -127,11 +154,21 @@ inferType ctx (Uop pos op e) = do
         Not -> (TBool, [(t1, TBool, pos)])
   return (rett, nub (c0 ++ c1))
 
+{-
+         Γ ⊢ e1 : t1 | C1      Γ ⊢ e2 : t2 | C2
+----------------------------------------------------------CT-Pair
+             Γ ⊢ (e1, e2) : t1 * t2 | C1 ∪ C2
+-}
 inferType ctx (Pair _ e1 e2) = do
   (t1, c1) <- inferType ctx e1
   (t2, c2) <- inferType ctx e2
   return (TProd t1 t2, nub (c1 ++ c2))
 
+{-
+         Γ ⊢ e : t | C
+--------------------------------CT-Fst          α, β are fresh
+    Γ ⊢ fst e : α | { t = α * β } ∪ C
+-}
 inferType ctx (Fst pos e) = do
   (t, c) <- inferType ctx e
   a <- TVar <$> freshTVar
@@ -139,6 +176,11 @@ inferType ctx (Fst pos e) = do
   let c0 = [(t, TProd a b, pos)]
   return (a, nub (c0 ++ c))
 
+{-
+         Γ ⊢ e : t | C
+--------------------------------CT-Snd          α, β are fresh
+    Γ ⊢ snd e : β | { t = α * β } ∪ C
+-}
 inferType ctx (Snd pos e) = do
   (t, c) <- inferType ctx e
   a <- TVar <$> freshTVar
@@ -155,6 +197,9 @@ inferType ctx (Cons pos e1 e2) = do
   (t2, c2) <- inferType ctx e2
   return (TList t1, nub ([(t2, TList t1, pos)] ++ c1 ++ c2))
 
+{-
+Implemented following a rule similar to what we do for CT-Case (see bellow)
+-}
 -- case e1 of | [] -> e2 | hd::tl -> e3
 inferType ctx (CaseL pos e1 e2 hd tl e3) = do
   (t1, c1) <- inferType ctx e1
@@ -165,17 +210,31 @@ inferType ctx (CaseL pos e1 e2 hd tl e3) = do
   (t3, c3) <- inferType ctx'' e3
   return (t2, nub ([(t1, TList a, pos), (t2, t3, pos)] ++ c1 ++ c2 ++ c3))
 
+{-
+         Γ ⊢ e : t | C
+-----------------------------------CT-Inl            α is fresh
+      Γ ⊢ inl e : t + α | C 
+-}
 inferType ctx (Inl _ e) = do
   a <- TVar <$> freshTVar
   (t, c) <- inferType ctx e
   return (TSum t a, c)
 
+{-
+         Γ ⊢ e : t | C
+----------------------------CT-Inr              α is fresh
+    Γ ⊢ inr e : α + t | C 
+-}
 inferType ctx (Inr _ e) = do
   a <- TVar <$> freshTVar
   (t, c) <- inferType ctx e
   return (TSum a t, c)
 
--- case e1 of | inl x -> e2 | inr y -> e3
+{-
+      Γ ⊢ e1 : t1 | C1       Γ, x : α ⊢ e2 : t2 | C2       Γ, y : β ⊢ e3 : t3 | C3
+---------------------------------------------------------------------------------------------CT-Case    α, β are fresh
+    Γ ⊢ case e1 of | inl x -> e2  | inr y -> e3 : t2 | {t1 = α + β, t2 = t3} ∪ C1 ∪ C2 ∪ C3
+-}
 inferType ctx (Case pos e1 x e2 y e3) = do
   (t1, c1) <- inferType ctx e1
   a <- TVar <$> freshTVar
@@ -186,6 +245,12 @@ inferType ctx (Case pos e1 x e2 y e3) = do
   (t3, c3) <- inferType ctx'' e3
   return (t2, nub ([(t1, TSum a b, pos), (t2, t3, pos)] ++ c1 ++ c2 ++ c3))
 
+{-
+      Γ ⊢ [x ↦ e1]e2 : t2 | C2        Γ ⊢ e1 : t1 | C1
+----------------------------------------------------------------CT-LetPoly
+            Γ ⊢ let x = e1 in e2 : t2 | C1 ∪ C2
+( adapted from 'Types and Programming' by Benjamin C. Pierce : Chapter 22.7 Let-Polymorphism )
+-}
 -- let x : t = e1 in e2
 inferType ctx (Let pos x mt e1 e2) = do
   (t1Aux, c1Aux) <- inferType ctx e1
@@ -201,10 +266,16 @@ inferType ctx (Let pos x mt e1 e2) = do
   (t2, c2) <- inferType ctx'' e2
   return (t2, nub (c1 ++ c2))
 
+{-
+   Γ, f : α ⊢ (fun x -> e1) : t1 | C1         Γ, f : Γ^-(t1) ⊢ e2 : t2 | C2
+-------------------------------------------------------------------------------CT-LetRec   α is fresh, Γ^-(τ) = generalize Γ τ
+          Γ ⊢ let rec f x = e1 in e2 : t2 | { t1 = α } ∪ C1 ∪ C2   
+( adapted from https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system#Typing_rule )
+-}
 -- let rec f (x : tx) : tr = e1Aux in e2
 -- e1 = (fun x : tx -> e1Aux)
 -- t1 = TArrow tx tr
--- model it as let f = e1 in e2
+-- model it as let f = e1 in e2 (but use different context for type inference than usual)
 inferType ctx (LetRec pos f x mtx mtr e1Aux e2) = do
   let e1 = Abs pos x mtx mtr e1Aux
   a <- TVar <$> freshTVar
