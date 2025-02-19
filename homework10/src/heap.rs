@@ -102,8 +102,8 @@ impl Heap {
         let mut root_curr_addr;
 
         // garbage collection happens in 2 passes
-        // first pass: idx == 0 and root-space == stack
-        // second pass: idx == 1 and root-space == to-space
+        // first pass: idx == 0 and root-space === stack
+        // second pass: idx == 1 and root-space === to-space
         for idx in 0..2 {
             // initialize to_next_addr and root_curr_addr variables
             // properly for each pass
@@ -125,8 +125,10 @@ impl Heap {
             while root_curr_addr < if idx == 0 { stack.len() } else { to_next_addr } {
                 // get the root word we will be examining
                 let root_word = if idx == 0 {
+                    // root word is in the stack
                     stack[root_curr_addr]
                 } else {
+                    // root word is in the heap
                     self.heap[root_curr_addr]
                 };
 
@@ -177,10 +179,10 @@ impl Heap {
                         } else {
                             // Case 3
                             // root word is a pointer that points to from_curr_addr
-                            // from_curr_addr in in from-space, this means that is is
+                            // from_curr_addr is in from-space, this means that is is
                             // a forwarding pointer
                             // we update root word to point to the same address
-                            // This we set root word equal to from word
+                            // Thus we set root word equal to from word
                             if idx == 0 {
                                 // root word is in the stack
                                 stack[root_curr_addr] = from_word;
