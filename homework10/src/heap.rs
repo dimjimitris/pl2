@@ -139,7 +139,10 @@ impl Heap {
                     // root word is a pointer that points to from word
                     let from_word = self.heap[from_curr_addr];
 
-                    if !from_word.is_pointer() {
+                    if !from_word.is_pointer()
+                        //&& from_curr_addr >= self.from_start_addr
+                        //&& from_curr_addr < self.from_next_addr
+                    {
                         // Case 1
                         // from word is not a pointer
                         // it is a header of a block in the from-space
