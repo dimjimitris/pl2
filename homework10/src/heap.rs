@@ -65,7 +65,7 @@ impl Heap {
 
     // attempts to allocate _words in the heap
     pub fn alloc(&mut self, size: usize, tag: u8, words: &[Word]) -> Option<usize> {
-        let header = self.header_compose(size, tag);
+        let header = Heap::header_compose(size, tag);
         let word_cnt = 1 + size;
 
         if self.from_next_addr + word_cnt > self.from_start_addr + self.size / 2 {
@@ -143,7 +143,7 @@ impl Heap {
                         // Case 1
                         // from word is not a pointer
                         // it is a header of a block in the from-space
-                        let (size, _) = self.header_decompose(from_word);
+                        let (size, _) = Heap::header_decompose(from_word);
                         let word_cnt = 1 + size;
 
                         // we copy this block to the to-space
@@ -202,7 +202,7 @@ impl Heap {
         self.from_next_addr = to_next_addr;
     }
 
-    fn header_compose(&self, size: usize, tag: u8) -> Word {
+    fn header_compose(size: usize, tag: u8) -> Word {
         let size = (size << 8) & 0x7F_FF_FF_00;
         let tag = (tag as usize) & 0x00_00_00_FF;
 
@@ -211,7 +211,7 @@ impl Heap {
         Word::from_int((size | tag) as i32)
     }
 
-    fn header_decompose(&self, header: Word) -> (usize, u8) {
+    fn header_decompose(header: Word) -> (usize, u8) {
         let header = header.to_int() as usize;
         let size = (header >> 8) & 0x00_7F_FF_FF;
         let tag = header & 0x00_00_00_FF;
