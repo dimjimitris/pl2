@@ -1,7 +1,10 @@
 # Programming Languages II course at ECE NTUA
 
 ## Contributors
-* *dimjimitris* - Dimitrios Georgousis (me)
+* `dimjimitris` - Dimitrios Georgousis (me)
+
+## Grade
+Homework solutions received full points in both main and bonus assignments & objectives.
 
 ## Repository contents
 * `homework{01..06}/`: homework assignments using the Coq language. These assignments contain various proofs and algorithm implementation for type inference etc... of miniML. A simple ML-type language.
